@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 31 19:14:29 2017
+
+@author: Shivam Sharma
+"""
+
+import os
+### CONFIG
+
+# Ensure all file paths are relative to orchestrator
+
+# GENERAL
+#where is the data at?
+raw_data_file = "./raw_data/train.csv"
+
+#if you have a test set, give path here:
+validation_path = "./raw_data/test.csv"
+
+#set this to "utf-8" as default
+encoding = "utf-8"
+
+#where should we export things to?
+export_dir = "./exports/"
+
+#what column is your target variable
+y = 'SalePrice'
+
+#if there is a data dictionary, give the path to it here or set it to false, xls only
+data_dict_path = ""
+    #column label for column of variable names
+variable_col = ""
+    #column label for column of descriptions
+description_col = ""
+    #column label for column of default values
+default_col = ""
+
+#tile file here that has ntile fn to return tile associated with certain y; set to False if none
+#   set to name of file (e.g. x_tiles for file common/x_tiles.py); take a look at common/x_tiles.py.example
+#   for an example tile file
+tile_file = False
+
+#how many tiles do you want?
+num_tiles = 20
+
+#max # of categories; adjust this sensitivity if preprocessing is classfying categorical variables as text
+category_threshold = 300
+
+#do you want featureselection & modelcreation to generate reports?
+write_reports = True
+
+# 2 - IMPUTE SETTINGS
+#set column dtypes
+col_dtypes_dict = {}
+
+#set this to true if you want all 64 bit dtypes to be set to 32
+convertto_32 = True
+
+#apply a custom transformation on your target variable, leave the list with 'original' if you want no transforms
+transforms = ['original', 'auto']
+
+#all the following custom column definitions must have unique sets
+#any columns you don't want to train on?
+blacklist = []
+blacklisttext = """
+""" #paste variables into here you want to blacklist
+blacklist = blacklist + blacklisttext.split()
+
+#any columns you want to keep but not train on, dont include these in blacklist
+carry_along = ["Id"]
+fico_vars = []
+app_form_vars = []
+carry_along = carry_along + fico_vars + app_form_vars
+
+#categorical variables to label encode numerically
+category_cols = ['PoolQC', 'MiscFeature', 'Alley', 'Fence', 'FireplaceQu', 'GarageType', 'GarageFinish', 'GarageQual', 'GarageCond', 'BsmtExposure', 'BsmtFinType2', 'BsmtQual', 'BsmtCond', 'BsmtFinType1', 'MasVnrType', 'Electrical', 'MSZoning', 'Street', 'LotShape', 'LandContour', 'Utilities', 'LotConfig', 'LandSlope', 'Neighborhood', 'Condition1', 'Condition2', 'BldgType', 'HouseStyle', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd', 'ExterQual', 'ExterCond', 'Foundation', 'Heating', 'HeatingQC', 'CentralAir', 'KitchenQual', 'Functional', 'PavedDrive', 'SaleType', 'SaleCondition']
+category_cols_text = """
+""" 
+category_cols = category_cols + category_cols_text.split()
+
+    #set to true if you want above categories to encode nan as a value
+encode_category_nans = True
+
+#conditions for each feature; deletes rows that don't meet these conditions
+conditions = []
+
+#columns to impute to the mean; must be numerical
+impute_to_mean = []
+impute_to_mean_text = """
+LotFrontage
+GarageYrBlt
+MasVnrArea
+""" 
+impute_to_mean = impute_to_mean + impute_to_mean_text.split()
+
+#dictionary with each column and value to impute the NA's to
+impute_to_value = {}
+
+
+#removes all rows that are NA for the columns listed below
+remove_na_rows = []
+imputeaway = """
+"""
+remove_na_rows = remove_na_rows + imputeaway.split()
+
+#random variables to be added in during impute
+random_variables = ["random_1", "random_2", "random_3"]
+
+#if you want to save selections of data for hands on checking out the data, add cols here
+# and they will save each row that is imputed for that col in impute dir in a csv
+save_imputed_rows = []
+
+# 3 - PRELIM MODEL SETTINGS 
+#set this to the max percentage of your variables you want listed as garbage in the prelim step
+throwaway = 0.50
+#set this to true if you want anything to happen at this stage
+prelim_step = True
+pre_rf = True
+pre_gbr = False
+pre_lgb = True
+
+# 4 - DATA PRUNE SETTINGS
+#after prelim step you should select a transform to use
+transform_chosen = 'boxcox'
+
+#removes sparse data points if sparse_threshold is specified 
+sparse_threshold = False
+    #specify specific cols to test for sparseness
+    #   if False, uses every column with a valid default value given in the data dictionary
+sparse_cols = False
+#the following are settings to create subsets of data from the data given; for modelling/benchmarks
+#create functions that takes a DF of X features and returns a DF with all X features you want to use
+# => save this function in common/dataselect.py
+#add each function name to data_subsets if you want it to be used
+data_subsets = {}
+
+#data_subsets = [{"Function": "full"},
+#                {"Function": "onlysparses"},
+#                {"Function": "nosparses"},
+#                {"Function": "nosparses", "Function": "camaro_raw_usm"},
+#                {"Function": "nosparses", "Function": "camaro_transform_usm"},
+#                {"Function_metadata": "all_transformed"},
+#                {"fico_score_in": ("original",["fico_score"],{},-999), "Name": "add_AS50"},
+#                {"fico_score_in": ("original",["fico_score"],{},-999), "Name": "add_AS50", "Function": "faisal_usm"},
+#                {"fico_score_in": ("original",["fico_score"],{},-999), "Name": "add_AS50", "Function": "colin_team_vars"},
+#                {"gross_annual_income_in": ("original", ["annual_gross_income"], {}, -999),
+#                 "cash_advance_indicator_in": ("original", ["cash_advance_indicator"], {}, -999),
+#                 "Name": "add_appformvars"},
+#                {"Function": "no_crvsn"},
+#                {"Function": "no_crvsn", "fico_score_in": ("original",["fico_score"],{},0), "Name": "add_AS50"}]
+
+#use this to ensure some features are kept through garbage step, especially for transforming/subsetting some data
+keep_features = []
+
+# 5 - FEATURE SELECTION SETTINGS
+#set to T/F if you want to use FS algo
+#there are two main settings to run this on: prelim & rounds
+#prelim will give info about which fs algos to use, the next step is to use rounds with those 
+#settings filled in
+    #general settings
+#add each datasubset num you want to use into the list below, if False will use all in dataprune_dir
+fs_use_datasubsets = [1]
+
+    #prelim settings
+#set this to false after you have looked at prelim analysis and chosen fs algos / set rounds settings
+init_round = False
+
+    #rounds settings
+
+#what algos you want to use for which rounds, must be structured as such:
+#   fs_algos_dict = {(bottom_limit_int,upper_limit_int) : ["fs", "algos", "you", "choose"],
+#                   (0,50):["mutualinfo","f_regress",...],
+#                   (50,100): ... and so on }
+# this is upper limit inclusive
+#options:
+# mutual_info
+# f_regress
+# recursive_svr
+# fs_gbr
+# fs_rf
+# fs_lgb
+# boruta_rf
+# boruta_gbr
+# all
+
+fs_algos_dict = {(0,30):["boruta_rf", "fs_gbr", "fs_rf", "fs_lgb"],
+                 (30,40):["fs_gbr", "fs_rf", "fs_lgb"],
+                 (40,200):["fs_rf", "fs_lgb"],
+                 (200,500):["f_regress", "fs_rf"],
+                 (500,2500): ["fs_rf"]}
+
+#specify the maximum # of features to drop in each range of features, similar to fs_algos_dict
+max_drop_dict = {(0,25):1,
+                 (25,35):3,
+                 (35,50):6,
+                 (50,70):15,
+                 (70,95):20,
+                 (95,125):30,
+                 (125,160):50,
+                 (160,200):80,
+                 (200,250):120,
+                 (250,350):170,
+                 (350,500):250,
+                 (500,800):400,
+                 (800,1200):700,
+                 (1200,1500):1100,
+                 (1500,2000):1400,
+                 (2000,2500):1800}
+
+#list of features you want to ensure are included in the FS analysis, deprecate this
+force_add_features = []
+
+#consecutive rounds will end when we reach this target # of features
+target_features = 20
+max_rounds = 40
+
+    #general settings for both 
+#boruta max # of iterations
+boruta_max_iter = 30
+
+if not boruta_max_iter:
+    boruta_max_iter = 100
+
+# 6 - FS Analysis Settings
+#what round of variables to choose from the previous fs selection step
+#what subset of data to choose from in dataselect step
+round_chosen = 12
+subset_chosen = 1
+
+#algos to run it on with
+fsa_gbr = True
+fsa_rf = True
+fsa_xgb = True
+fsa_lgbm = True
+
+# 7 - MODEL CREATION
+
+#setup models in the following dictionary as such:
+    #modeldict = {"modelname" : (subset_num, maskvarslist),
+    #             "modelname1": (2, ["var_1", "var_2", ... ])
+    #             "modelname2": ... } 
+    # using false will let you use all variables in the subset; random variables taken out,if you set the
+    # following to true:
+full_subset_models = True
+    # using false will also create models for the last 3 rounds of the subset if step 5 was run for the subset
+    # if you set the following to true:
+last_3_rounds_models = True
+
+model_dict = {"finalmodel": (1, ['1stFlrSF', 'GrLivArea', 'BsmtFinSF1', 'PavedDrive', 'ExterCond', 'KitchenQual', 'TotalBsmtSF', 'GarageType', 'OverallCond', 'YearBuilt', 'GarageCars', 'Neighborhood', 'YearRemodAdd', 'Fireplaces', 'BsmtFinType1', 'LotFrontage', 'MasVnrArea', 'LotArea', 'FullBath', 'OpenPorchSF', 'CentralAir', 'OverallQual', '2ndFlrSF', 'GarageArea'])}
+
+### PROCESSING
+#convert paths to absolute paths
+raw_data_file = os.path.abspath(raw_data_file)
+
+#convert the 64 dict to a 32 dict
+if convertto_32 and len(col_dtypes_dict) > 0:
+    dtypes_32_dict = {}
+
+    for key,val in col_dtypes_dict.items():
+        new = val.replace('64', '32')
+        dtypes_32_dict[key] = new
+
+    col_dtypes_dict = dtypes_32_dict
+
+#setup all export dirs
+export_dir = os.path.abspath(export_dir)
+if not os.path.isdir(export_dir):
+    os.makedirs(export_dir, exist_ok=True)
+
+prelimstep_dir = export_dir + '/3_prelimstep'
+if not os.path.isdir(prelimstep_dir):
+    os.makedirs(prelimstep_dir, exist_ok=True)
+
+dataprune_dir = export_dir + '/4_dataprune'
+if not os.path.isdir(dataprune_dir):
+    os.makedirs(dataprune_dir, exist_ok=True)
+
+fs_dir = export_dir + '/5_featureselection'
+if not os.path.isdir(fs_dir):
+    os.makedirs(fs_dir, exist_ok=True)
+
+fsanalysis_dir = export_dir + '/6_fsanalysis'
+if not os.path.isdir(fsanalysis_dir):
+    os.makedirs(fsanalysis_dir, exist_ok=True)
+
+modelcreation_dir = export_dir + '/7_modelcreation'
+if not os.path.isdir(modelcreation_dir):
+    os.makedirs(modelcreation_dir, exist_ok=True)
+
+dataset_dir = export_dir + "/Datasets"
+if not os.path.isdir(dataset_dir):
+    os.makedirs(dataset_dir, exist_ok=True)
+
+#setup path to modeldb
+modeldb_path = export_dir + '/modeldb.pk'
+#setup path to transform file
+transform_file_path = "./common/transforms.py"
+transform_file_path = os.path.abspath(transform_file_path)
+#setup path to database of datasets
+datasets_db_path = dataset_dir + "/datasets_db.pk"
+
+#this dictionary maps inverse operations, ensure to add to this dict if you make new transformations
+inverse_dictionary = {"original": "original",
+                      "natlog": "natexp",
+                      "logit": "inv_logit",
+                      "boxcox": "inv_boxcox",
+                      "zscore": "inv_zscore"}
+
+#post processing: adding the originals as inverses of inverses
+new_dict = {}
+for k, v in inverse_dictionary.items():
+    new_dict[v] = k
+
+inverse_dictionary = {**inverse_dictionary, **new_dict}
