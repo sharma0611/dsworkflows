@@ -9,14 +9,14 @@ Created on Wed May 31 19:14:29 2017
 import os
 ### CONFIG
 
-# Ensure all file paths are relative to orchestrator
+# Ensure all file paths are relative to where you run the scripts
 
 # GENERAL
 #where is the data at?
-raw_data_file = "./raw_data/train.csv"
+train_data = ""
 
 #if you have a test set, give path here:
-validation_path = "./raw_data/test.csv"
+test_data = ""
 
 #set this to "utf-8" as default
 encoding = "utf-8"
@@ -25,16 +25,7 @@ encoding = "utf-8"
 export_dir = "./exports/"
 
 #what column is your target variable
-y = 'SalePrice'
-
-#if there is a data dictionary, give the path to it here or set it to false, xls only
-data_dict_path = ""
-    #column label for column of variable names
-variable_col = ""
-    #column label for column of descriptions
-description_col = ""
-    #column label for column of default values
-default_col = ""
+y = ''
 
 #tile file here that has ntile fn to return tile associated with certain y; set to False if none
 #   set to name of file (e.g. x_tiles for file common/x_tiles.py); take a look at common/x_tiles.py.example
