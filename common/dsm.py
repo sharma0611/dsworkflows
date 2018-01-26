@@ -54,4 +54,3 @@ class Dataset_Manager(object):
         ds = load_obj(dataset_path)
         return ds
 
-

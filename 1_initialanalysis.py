@@ -32,19 +32,29 @@ from shutil import copyfile
 from common.datainteract import Dataset
 
 # new imports
-from config.config import train_data
-
-
-
-
-#Turn off runtime warnings (for comparisons with np.nan)
-#warnings.filterwarnings("ignore",category =RuntimeWarning)
+from config.config import train_data, col_dtypes_dict, encoding, export_dir, custom_transforms, auto_transform_vars
+from common.dsm import Dataset_Manager
+import pandas as pd
 
 #Read in the raw data
-raw_df = pd.read_csv(raw_data_file, dtype=col_dtypes_dict, encoding=encoding)
+raw_df = pd.read_csv(train_data, dtype=col_dtypes_dict, encoding=encoding)
+
+#Instantiate Dataset Manager & create the Dataset object
+dsm = Dataset_Manager(export_dir)
+ds = dsm.create_dataset("raw", raw_df)
+
+#set the target variable
+ds.set_target(y)
+
+#Apply any transforms you specified in config
+#The Dataset object understands when you apply transformations to the target variable; saving them as alt target variables for futher analysis
+ds.apply_transforms_metadata(custom_transforms)
+
+#Apply auto-transforms to any variables you specify
+ds.auto_transform(auto_transform_vars)
 
 #Create a Dataset object to store the raw data and metadata
-name = "Raw"
+name = "raw"
 #use dataset manager instead this time
 mydataset = Dataset(name, raw_df, y)
 
