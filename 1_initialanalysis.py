@@ -2,16 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 ****************************************
-    Shivam Sharma (CIH745)
-    Data Science Co-op
-    Summer 2017
+    Shivam Sharma
+    sharma0611
 ****************************************
 
 Script: Initial Analysis & Setup
 Purpose: Runs setup for dataset; initializes objects from config settings
 
 """
-
 
 from importlib import import_module
 from importlib.util import find_spec, module_from_spec
@@ -33,21 +31,30 @@ import os
 from shutil import copyfile
 from common.datainteract import Dataset
 
+# new imports
+from config.config import train_data
+
+
+
+
 #Turn off runtime warnings (for comparisons with np.nan)
-warnings.filterwarnings("ignore",category =RuntimeWarning)
+#warnings.filterwarnings("ignore",category =RuntimeWarning)
 
 #Read in the raw data
 raw_df = pd.read_csv(raw_data_file, dtype=col_dtypes_dict, encoding=encoding)
 
 #Create a Dataset object to store the raw data and metadata
 name = "Raw"
+#use dataset manager instead this time
 mydataset = Dataset(name, raw_df, y)
 
-
 #Apply the transformations to y suggested in config
+#make transforms spec clear first in Dataset object
+#apply transforms from specs always
 mydataset.apply_transforms_y()
 
 #Create a tile file if neccessary
+#make this programmatic so no file is ever needed to be imported
 mydataset.make_tile_file()
 
 #Analyse dataframe & save analysis
@@ -58,5 +65,4 @@ mydataset.analyse_target_distribution()
 
 #Save the dataset
 mydataset.save()
-
 

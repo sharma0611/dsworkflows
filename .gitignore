@@ -1,5 +1,10 @@
+#vim files
+*.swp
+
 # your personalized configuration files
 config/config.py
+# any of your data used for training/testing
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
