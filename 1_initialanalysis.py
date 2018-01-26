@@ -32,7 +32,7 @@ from shutil import copyfile
 from common.datainteract import Dataset
 
 # new imports
-from config.config import train_data, col_dtypes_dict, encoding, export_dir, custom_transforms, auto_transform_vars
+from config.config import train_data, col_dtypes_dict, encoding, export_dir, custom_transforms, auto_transform_vars, num_tiles
 from common.dsm import Dataset_Manager
 import pandas as pd
 
@@ -53,26 +53,15 @@ ds.apply_transforms_metadata(custom_transforms)
 #Apply auto-transforms to any variables you specify
 ds.auto_transform(auto_transform_vars)
 
-#Create a Dataset object to store the raw data and metadata
-name = "raw"
-#use dataset manager instead this time
-mydataset = Dataset(name, raw_df, y)
-
-#Apply the transformations to y suggested in config
-#make transforms spec clear first in Dataset object
-#apply transforms from specs always
-mydataset.apply_transforms_y()
-
-#Create a tile file if neccessary
-#make this programmatic so no file is ever needed to be imported
-mydataset.make_tile_file()
+#Create a tiling for the target variable
+ds.tile_y(num_tiles)
 
 #Analyse dataframe & save analysis
-mydataset.analyse_dataframe()
+ds.analyse_dataframe()
 
 #Analyse transformed & non-transformed output variable distributions 
-mydataset.analyse_target_distribution()
+ds.analyse_target_distribution()
 
 #Save the dataset
-mydataset.save()
+ds.save()
 
