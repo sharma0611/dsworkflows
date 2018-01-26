@@ -43,15 +43,24 @@ class Dataset(object):
         dataframe_path = curr_dataset_dir + "/dataframe.pk"
 
         #init attributes
+        self.export_dir = dataset_export_dir
         self.curr_dataset_dir = curr_dataset_dir
         self.name = name
         self.dataset_path = dataset_path
         self.dataframe_path = dataframe_path
         self.transforms_metadata = {}
         self.transforms_y = []
+        self.le_dict = {}
+        self.impute_dict = {}
+        self.parent = None
+        self.tiling = {}
 
         #init dataframe
         self.df = df
+
+        #setting X (features)
+        X = df.columns.tolist()
+        self.X = X
 
     # function to save the dataset object into pickled file & associated dataframe to pickled file
     def save(self):
@@ -64,12 +73,23 @@ class Dataset(object):
         #save Dataset object
         save_obj(self, self.dataset_path)
 
+    def copy(self, new_name):
+        copy_ds = Dataset(self.export_dir, new_name, self.df)
+        copy_ds.set_transforms_metadata(self.transforms_metadata)
+        copy_ds.set_transforms_y(self.transforms_y)
+        copy_ds.set_le_dict(self.le_dict)
+        copy_ds.set_impute_dict(self.impute_dict)
+        return copy_ds
+
+
     #function to load in the dataframe associated with the Dataset object
     def load_df(self):
         df = load_obj(self.dataframe_fp)
         self.df = df
 
     # Getters
+    def get_name(self):
+        return self.name
 
     def get_ds_dir(self):
         return self.curr_dataset_dir
@@ -78,8 +98,32 @@ class Dataset(object):
         return self.dataset_path
 
     def set_target(self, y):
-        assert y in self.df.columns.tolist()
+        assert y in self.X
         self.y = y
+
+        #remove target from X features
+        X = self.X
+        X.remove(y)
+        self.X = X
+
+    # Setters
+
+    def set_parent(self, parent_ds):
+        parent_name = parent_ds.get_name()
+        self.parent = parent_name
+
+    def set_le_dict(self, le_dict):
+        self.labelencode_dict = le_dict
+
+    def set_impute_dict(self, impute_dict):
+        self.impute_dict = impute_dict
+
+    def set_transforms_y(self, transforms_y):
+        self.transforms_y = transforms_y
+        #ensure it is not in X
+        X = self.X
+        X = list(set(X) - set(transforms_y))
+        self.X = X
 
     # Data Transformations
 
@@ -99,62 +143,18 @@ class Dataset(object):
 
     # implement so that you can either create a new dataset or keep the old one
     def apply_transform_metadata(self, transform_metadata, new_ds=False, new_ds_name=""):
-        for var_name, var_spec in var_spec_dict.items():
-            curr_df = apply_spec_to_df(var_name, var_spec, self.df)
-
-
-    #transform_spec -> tuple(transform_fn, transform_fn_args, transform_fn_kwargs, default_val)
-    #if 'X' is one of the keys; use its values to trim the dataset
-    #only keep specified X, & variables from get_non_X()
-    #ensure order of var_spec_dict is respected; as to split with X when neccessary, etc
-    def apply_transform_metadata(self, var_spec_dict):
-        # take current raw dataframe and perform deep copy
-        raw_df = self.raw_df
-        curr_df = raw_df.copy(deep=True)
-        transform_mod = import_module('.transforms', package='common')
-        curr_name = self.name
-        for var_name, var_spec in var_spec_dict.items():
-            if var_name == "X": #interpret this as a cut step; where X is pruned
-                #trim immediately
-                X = var_spec
-                keep = X + self.get_non_X()
-                curr_df = curr_df[keep]
-            elif var_name == "Name": #interpret this as a rename in the sequential transform dict
-                #add to the name
-                curr_name = curr_name + "_" + str(var_spec)
-            elif var_name == "Function":
-                #must be a function that outputs a dataframe
-                #add to name
-                curr_name = curr_name + "_" + str(var_spec)
-                df_func = getattr(transform_mod, var_spec)
-                curr_df = df_func(curr_df) #apply the function
-            elif var_name == "Function_metadata":
-                #must be a function that takes a dataframe & returns a suggested metadata to apply
-                #does not return out from this function block
-                #add to name
-                df_func = getattr(transform_mod, var_spec)
-                curr_transform_metadata = df_func(curr_df) #apply the function
-                curr_transform_metadata["Name"] = str(var_spec)
-                ds = self.apply_transform_metadata(curr_transform_metadata)
-                return ds
-            else:
-                #otherwise, the entry is a legitimate var_name, var_spec pair
-                curr_df = apply_spec_to_df(var_name, var_spec, curr_df)
-
-        #take new dataframe & initialize new dataset
-        ds = Dataset(curr_name, curr_df, self.y)
-        #first we should update the metadata with previous metadata + new metadata
-        curr_spec_dict = self.transforms_metadata
-        curr_transforms_metadata = {**curr_spec_dict, **var_spec_dict}
-        ds.set_transforms_metadata(curr_transforms_metadata)
-        #update rest of the attributes to parent's attributes
-        ds.set_le_dict(self.labelencode_dict)
-        ds.set_impute_dict(self.impute_dict)
-        ds.set_transforms_y(self.transforms_y)
-        ds.carry_along_split(self.carry_along) #updates X to not include carry along
-        #identify parent dataset
-        ds.set_parent(self.dataset_num)
-        return ds
+        if new_ds:
+            new_ds = self.copy(new_ds_name)
+            new_ds.apply_transform_metadata(transform_metadata)
+            new_ds.set_parent(self)
+            return new_ds
+        else:
+            for var_name, var_spec in var_spec_dict.items():
+                new_df = apply_spec_to_df(var_name, var_spec, self.df)
+                self.df = new_df
+            #update transforms metadata
+            self.transforms_metadata =  {**self.transforms_metadata, **var_spec_dict}
+            return self
 
     #takes an array of variables you want to auto transform, and a new name for the dataset
     def auto_transform(self, auto_vars, new_ds=False, new_ds_name=""):
@@ -163,7 +163,8 @@ class Dataset(object):
             auto_spec = suggest_transform_fn(var_data, var_name)
             auto_transform_metadata["auto_" + var] = auto_spec
 
-        self.apply_transform_metadata
+        ds = self.apply_transform_metadata(auto_transform_metadata, new_ds, new_ds_name)
+        return ds
 
 
 
