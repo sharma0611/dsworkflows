@@ -9,6 +9,8 @@
 Module: Univariate Analysis
 Purpose: Hosts functions to analyse univariate data
 """
+import numpy as np
+
 
 def safe_fill(row, func, default_val, args, kwargs):
     try:
