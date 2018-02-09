@@ -15,6 +15,7 @@ from common.utils import ensure_folder, save_obj, load_obj
 from common.tilefile import create_tiling
 from common.univariateanalysis import suggest_transform_fn, apply_spec_to_df
 from common.multivariateanalysis import full_analysis
+from common.graphing import figures_to_pdf, hist_prob_plot, histogram_boxcox_plot
 
 class Dataset(object):
     """ 
@@ -84,6 +85,8 @@ class Dataset(object):
 
 
     #function to load in the dataframe associated with the Dataset object
+    #It is not loaded on instantiation since we sometimes use the skeleton Dataset object to perform operations without the dataframe
+    #such as applying transformations on new data, viewing related model results, etc.
     def load_df(self):
         df = load_obj(self.dataframe_fp)
         self.df = df
@@ -174,3 +177,23 @@ class Dataset(object):
     def analyse_dataframe(self, category_threshold=100):
         full_analysis(self.df, self.curr_dataset_dir, category_threshold)
 
+    def analyse_target_distribution(self):
+        #get y data
+        y = self.y
+        output_var_data = self.df[y]
+
+        #Histogram and boxcox plot for output
+        hist_boxcox_fig = histogram_boxcox_plot(y, output_var_data)
+
+        #get all transformed y variable names
+        transforms = self.transforms_y
+
+        #Take each transform & produce a histogram & probplot
+        figures = [hist_boxcox_fig]
+        for transform in transforms:
+            curr_output_set = self.df[transform]
+            curr_fig = hist_prob_plot(transform, curr_output_set)
+            figures.append(curr_fig)
+
+        pdffile_path = self.curr_dataset_dir + '/distributionofoutput.pdf'
+        figures_to_pdf(figures, pdffile_path)

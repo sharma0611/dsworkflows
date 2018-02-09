@@ -27,20 +27,28 @@ ds.set_target(y)
 
 #Apply any transforms you specified in config
 #The Dataset object understands when you apply transformations to the target variable; saving them as alt target variables for futher analysis
+print("Applying custom transformations...")
 ds.apply_transform_metadata(custom_transforms)
 
 #Apply auto-transforms to any variables you specify
+print("Applying auto transformations...")
 ds.auto_transform(auto_transform_vars)
 
 #Create a tiling for the target variable
+print("Creating a tiling for y...")
 ds.tile_y(num_tiles)
 
 #Analyse dataframe & save analysis
+print("Analysing raw data & features...")
 ds.analyse_dataframe()
 
 #Analyse transformed & non-transformed output variable distributions 
+print("Analysing target variable distribution...")
 ds.analyse_target_distribution()
 
 #Save the dataset
+print("Saving your dataset...")
 ds.save()
+
+print("Initial Analysis Complete.")
 
