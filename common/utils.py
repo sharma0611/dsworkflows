@@ -70,7 +70,7 @@ def ensure_folder(path):
 def save_obj(obj, file_path):
     pk_dump(obj, file_path)
 
-def read_obj(file_path):
+def load_obj(file_path):
     obj = pk_load(file_path)
     return obj
 

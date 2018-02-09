@@ -11,9 +11,9 @@ Purpose: Hosts the Dataset object & its functions to interact with the dataset
 
 # cannot load dataset from Dataset object; must use Dataset_Manager
 """
-from .utils import ensure_folder, save_obj, read_obj
-from .tilefile import create_tiling
-from .univariateanalysis import suggest_transform_fn, apply_spec_to_df
+from common.utils import ensure_folder, save_obj, load_obj
+from common.tilefile import create_tiling
+from common.univariateanalysis import suggest_transform_fn, apply_spec_to_df
 
 class Dataset(object):
     """ 
@@ -142,25 +142,29 @@ class Dataset(object):
 
 
     # implement so that you can either create a new dataset or keep the old one
-    def apply_transform_metadata(self, transform_metadata, new_ds=False, new_ds_name=""):
+    def apply_transform_metadata(self, transform_metadata_in, new_ds=False, new_ds_name=""):
         if new_ds:
             new_ds = self.copy(new_ds_name)
-            new_ds.apply_transform_metadata(transform_metadata)
+            new_ds.apply_transform_metadata(transform_metadata_in)
             new_ds.set_parent(self)
             return new_ds
         else:
-            for var_name, var_spec in var_spec_dict.items():
+            for var_name, var_spec in transform_metadata_in.items():
+                if self.y in var_spec[1]:
+                    # y is being transformed thus add to transforms_y
+                    self.transforms_y.append(var_name)
                 new_df = apply_spec_to_df(var_name, var_spec, self.df)
                 self.df = new_df
             #update transforms metadata
-            self.transforms_metadata =  {**self.transforms_metadata, **var_spec_dict}
+            self.transforms_metadata =  {**self.transforms_metadata, **transform_metadata_in}
             return self
 
     #takes an array of variables you want to auto transform, and a new name for the dataset
     def auto_transform(self, auto_vars, new_ds=False, new_ds_name=""):
         auto_transform_metadata = {}
         for var in auto_vars:
-            auto_spec = suggest_transform_fn(var_data, var_name)
+            var_data = self.df[var]
+            auto_spec = suggest_transform_fn(var_data, var)
             auto_transform_metadata["auto_" + var] = auto_spec
 
         ds = self.apply_transform_metadata(auto_transform_metadata, new_ds, new_ds_name)

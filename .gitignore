@@ -5,6 +5,7 @@
 config/config.py
 # any of your data used for training/testing
 data/
+exports/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

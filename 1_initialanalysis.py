@@ -11,28 +11,7 @@ Purpose: Runs setup for dataset; initializes objects from config settings
 
 """
 
-from importlib import import_module
-from importlib.util import find_spec, module_from_spec
-import pandas as pd
-from scipy import stats
-import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pdf
-import numpy as np
-from math import log
-
-#import config settings
-from common.config import y, raw_data_file, col_dtypes_dict, encoding
-from common.featureanalysis import full_analysis, produce_transform_fn
-from common.tilefile import createtilefile, add_to_file
-import csv
-import warnings
-
-import os
-from shutil import copyfile
-from common.datainteract import Dataset
-
-# new imports
-from config.config import train_data, col_dtypes_dict, encoding, export_dir, custom_transforms, auto_transform_vars, num_tiles
+from config.config import train_data, col_dtypes_dict, encoding, export_dir, custom_transforms, auto_transform_vars, num_tiles, y
 from common.dsm import Dataset_Manager
 import pandas as pd
 
@@ -48,7 +27,7 @@ ds.set_target(y)
 
 #Apply any transforms you specified in config
 #The Dataset object understands when you apply transformations to the target variable; saving them as alt target variables for futher analysis
-ds.apply_transforms_metadata(custom_transforms)
+ds.apply_transform_metadata(custom_transforms)
 
 #Apply auto-transforms to any variables you specify
 ds.auto_transform(auto_transform_vars)
