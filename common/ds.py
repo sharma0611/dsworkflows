@@ -14,6 +14,7 @@ Purpose: Hosts the Dataset object & its functions to interact with the dataset
 from common.utils import ensure_folder, save_obj, load_obj
 from common.tilefile import create_tiling
 from common.univariateanalysis import suggest_transform_fn, apply_spec_to_df
+from common.multivariateanalysis import full_analysis
 
 class Dataset(object):
     """ 
@@ -170,6 +171,6 @@ class Dataset(object):
         ds = self.apply_transform_metadata(auto_transform_metadata, new_ds, new_ds_name)
         return ds
 
+    def analyse_dataframe(self, category_threshold=100):
+        full_analysis(self.df, self.curr_dataset_dir, category_threshold)
 
-
-# when applying transformations, ensure you filter for when you apply any transform to the set target variable
