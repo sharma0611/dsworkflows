@@ -36,7 +36,10 @@ def apply_spec_to_df(var_name, var_spec, raw_df):
     transform_fn_str = var_spec[0]
     transform_fn_args = var_spec[1]
     transform_fn_kwargs = var_spec[2]
-    default_val = var_spec[3]
+    try:
+        default_val = var_spec[3]
+    except IndexError:
+        default_val = np.nan
     transform_fn = getattr(transform_mod, transform_fn_str) #get the function
     raw_df = apply_transform_func(raw_df, var_name, default_val, transform_fn, transform_fn_args, transform_fn_kwargs)
     return raw_df
@@ -49,7 +52,7 @@ def suggest_transform_fn(var_data, input_var_name):
 
     #First, check if data is not normal
     pval_orig = normality_test(var_data, sig_lvl)
-    original_spec = ("original", [input_var_name], {}, np.nan)
+    original_spec = ("original", [input_var_name], {})
     #join to results
     results["original"] = (pval_orig, original_spec)
 
@@ -76,7 +79,7 @@ def suggest_transform_fn(var_data, input_var_name):
     temp_set = [maxlog * (y + shift) + 1 for y in var_data_boxcox]
     #check normality
     pval_boxcox = normality_test(var_data_boxcox, sig_lvl)
-    boxcox_spec = ("boxcox", [input_var_name], {'maxlog': maxlog, 'shift': shift}, np.nan)
+    boxcox_spec = ("boxcox", [input_var_name], {'maxlog': maxlog, 'shift': shift})
     if np.any(temp_set) <= 0: #or abs(maxlog) > 5:
         pass
         #you cannot perform the inverse so do not use boxcox so we pass
@@ -92,7 +95,7 @@ def suggest_transform_fn(var_data, input_var_name):
 
     #check if zscore is satisfactory
     pval_zscore = normality_test(var_data_zscore, sig_lvl)
-    zscore_spec = ("zscore", [input_var_name], {'mean':mean,'std':std_dev}, np.nan)
+    zscore_spec = ("zscore", [input_var_name], {'mean':mean,'std':std_dev})
     results["zscore"] = (pval_zscore, zscore_spec)
 
     #Otherwise, none of our normalization techniques worked

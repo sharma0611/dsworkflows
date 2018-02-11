@@ -107,3 +107,5 @@ def full_analysis(mydf, exportingdirectory, category_threshold=40):
         total = len(number_cols) + len(categorical_vars) + len(text_vars)
         mywriter.writerow(["TOTAL:", total])
 
+    return categorical_vars, text_vars_na, number_cols_na
+

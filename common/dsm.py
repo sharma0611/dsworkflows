@@ -11,8 +11,8 @@ Purpose: Hosts the manager for all datasets, dataset instatiation, loading, & vi
 
 """
 
-from .utils import ensure_folder, fetch_db, save_obj, load_obj
-from .ds import Dataset
+from common.utils import ensure_folder, fetch_db, save_obj, load_obj
+from common.ds import Dataset
 
 class Dataset_Manager(object):
     """
@@ -35,6 +35,10 @@ class Dataset_Manager(object):
     def save_dataset_db(self, db):
         save_obj(db, self.db_path)
 
+    def copy_dataset(self, name):
+        new_ds = self.copy(name)
+        return new_ds
+
     def create_dataset(self, name, df):
         #init Dataset
         ds = Dataset(self.dataset_export_dir, name, df)
@@ -51,6 +55,10 @@ class Dataset_Manager(object):
         #grab dataset path
         db = self.fetch_dataset_db()
         ds_path = db[name]
-        ds = load_obj(dataset_path)
+        ds = load_obj(ds_path)
         return ds
+
+    def apply_all_ops(self, new_dataset, target_dataset):
+        op_history = target_dataset.op_history
+        new_dataset.apply_ops(op_history)
 

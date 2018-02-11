@@ -88,7 +88,6 @@ impute_to_mean = impute_to_mean + impute_to_mean_text.split()
 #dictionary with each column and value to impute the NA's to
 impute_to_value = {}
 
-
 #removes all rows that are NA for the columns listed below
 remove_na_rows = []
 imputeaway = """
