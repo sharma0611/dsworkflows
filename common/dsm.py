@@ -35,8 +35,16 @@ class Dataset_Manager(object):
     def save_dataset_db(self, db):
         save_obj(db, self.db_path)
 
-    def copy_dataset(self, name):
-        new_ds = self.copy(name)
+    def copy_dataset(self, ds, name):
+        new_ds = ds.copy(name)
+        name = new_ds.name
+
+        #save {name: path} to dataset db
+        ds_path = new_ds.get_ds_path()
+        db = self.fetch_dataset_db()
+        db[name] = ds_path
+        self.save_dataset_db(db)
+
         return new_ds
 
     def create_dataset(self, name, df):

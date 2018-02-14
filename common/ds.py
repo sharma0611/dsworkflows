@@ -3,7 +3,7 @@
 """
 ****************************************
     Shivam Sharma 
-    sharma0611
+    sharma0611 
 ****************************************
 
 Module: Dataset
@@ -11,14 +11,16 @@ Purpose: Hosts the Dataset object & its functions to interact with the dataset
 
 """
 from common.utils import ensure_folder, save_obj, load_obj
-from common.tilefile import create_tiling
+from common.tilefile import create_tiling, ntile
 from sklearn.model_selection import train_test_split
 from common.univariateanalysis import suggest_transform_fn, apply_spec_to_df
-from common.multivariateanalysis import full_analysis
+from common.multivariateanalysis import full_analysis, safe_loc
 from common.graphing import figures_to_pdf, hist_prob_plot, histogram_boxcox_plot
 from common.imputations import (impute_categories, apply_le_dict, get_means, impute_na_rows, impute_blacklist, 
         add_random_variables, impute_conditions, impute_to_value)
 from copy import deepcopy
+from numpy import array
+
 
 class Dataset(object):
     """ 
@@ -61,6 +63,10 @@ class Dataset(object):
         self.tiling = {}
         self.y = None
         self.carry_along = []
+        self.test_df = None
+        self.train_df = None
+        self.random_variables = []
+        self.garbage_features = {}
 
         #init dataframe
         self.df = df
@@ -76,6 +82,8 @@ class Dataset(object):
 
         #delete dataframe from Dataset object
         del self.df
+        del self.train_df
+        del self.test_df
         
         #save Dataset object
         save_obj(self, self.dataset_path)
@@ -98,16 +106,7 @@ class Dataset(object):
     def copy(self, new_name):
         copy_df = self.df.copy(deep=True)
         copy_ds = Dataset(self.export_dir, self.name + "_" + new_name, copy_df)
-        #copy attributes
-        copy_ds.transforms_metadata = self.transforms_metadata
-        copy_ds.transforms_y = self.transforms_y
-        copy_ds.le_dict = self.le_dict
-        copy_ds.impute_dict = self.impute_dict
-        copy_ds.op_history = self.op_history
-        copy_ds.tiling = self.tiling
-        copy_ds.y = self.y
-        # add copy operation to op history
-        # copy_ds.new_op("copy", new_name)
+        copy_ds.apply_ops(self.op_history)
         return copy_ds
 
     #function to load in the dataframe associated with the Dataset object
@@ -127,19 +126,41 @@ class Dataset(object):
     def get_ds_path(self):
         return self.dataset_path
 
+    def get_all_y(self):
+        return [self.y] + self.transforms_y
+
+    def get_X(self):
+        return self.X
+
+    def get_random_variables(self):
+        return self.random_variables
+
+    def get_garbage_ftrs(self, y):
+        garbage_ftrs = self.garbage_features[y]
+        return garbage_ftrs
+
+    # Setters
+
     def set_target(self, y):
         assert y in self.X
         self.y = y
 
         #remove target from X features
-        X = self.X
-        X.remove(y)
-        self.X = X
+        self.X.remove(y)
 
         #add an op
         self.new_op("set_target", y)
 
-    # Setters
+    #function to set aside a feature as a transformed y variable 
+    def add_y_transform(self, transform_y):
+        # this is a NON OP function; should not be called from anywhere except by apply_transform_metadata
+        self.transforms_y.append(transform_y)
+
+        #remove target from X features
+        try:
+            self.X.remove(transform_y)
+        except:
+            pass
 
     def update_le_dict(self, le_dict):
         self.labelencode_dict = {**self.le_dict, **le_dict}
@@ -147,16 +168,20 @@ class Dataset(object):
     def update_impute_dict(self, impute_dict):
         self.impute_dict = {**self.impute_dict, **impute_dict}
 
-    def set_transforms_y(self, transforms_y):
-        self.transforms_y = transforms_y
-        #ensure it is not in X
-        X = self.X
-        X = list(set(X) - set(transforms_y))
-        self.X = X
-
     def set_y_tiles(self, tiling):
         self.tiling = tiling
         self.new_op("set_y_tiles", tiling)
+
+    def tile_func(self, value): #must set y tiles for this to be a thing
+        return ntile(value, self.tiling)
+
+    def set_category_cols(self, category_cols):
+        self.category_cols = category_cols
+        self.new_op("set_category_cols", category_cols)
+
+    def set_garbage_ftrs(self, y, garbage_ftrs):
+        self.garbage_features[y] = garbage_ftrs
+        self.new_op("set_garbage_ftrs", y, garbage_ftrs)
 
     # Data Transformations
 
@@ -169,6 +194,47 @@ class Dataset(object):
         self.test_i = test_i
         self.new_op("create_train_test")
 
+    def load_test_train_dfs(self):
+        cooked_df = self.df
+        train_i = self.train_i
+        test_i = self.test_i
+        test_df = safe_loc(cooked_df, test_i)
+        train_df = safe_loc(cooked_df, train_i)
+        self.test_df = test_df
+        self.train_df = train_df
+
+    #only call this after loading test/train dfs
+    def get_test_train_X_arrays(self, X=False):
+        if not X:
+            X = self.X
+        test_df = self.test_df
+        train_df = self.train_df
+        train_X_df = train_df[X]
+        train_X_arr = array(train_X_df)
+        test_X_df = test_df[X]
+        test_X_arr = array(test_X_df)
+        train_X_shape = train_X_arr.shape
+        test_X_shape = test_X_arr.shape
+        self.train_X_shape = train_X_shape
+        self.test_X_shape = test_X_shape
+        return test_X_arr, train_X_arr
+
+    def get_train_X_shape(self):
+        return self.train_X_shape
+    
+    def get_test_X_shape(self):
+        return self.test_X_shape
+
+    #only call this after loading test/train dfs
+    def get_test_train_var_arrays(self, var):
+        test_df = self.test_df
+        train_df = self.train_df
+        train_var_series = train_df[var]
+        train_var_arr = array(train_var_series)
+        test_var_series = test_df[var]
+        test_var_arr = array(test_var_series)
+        return test_var_arr, train_var_arr
+
     #dyanmic op; so not a part of operations
     def tile_y(self, num_tiles):
         y_data = self.df[self.y]
@@ -176,41 +242,29 @@ class Dataset(object):
         self.set_y_tiles(tiling)
 
     # implement so that you can either create a new dataset or keep the old one
-    def apply_transform_metadata(self, transform_metadata_in, new_ds=False, new_ds_name=""):
-        if new_ds:
-            new_ds = self.copy(new_ds_name)
-            new_ds.apply_transform_metadata(transform_metadata_in)
-            return new_ds
-        else:
-            for var_name, var_spec in transform_metadata_in.items():
-                if self.y in var_spec[1]:
-                    # y is being transformed thus add to transforms_y
-                    self.transforms_y.append(var_name)
-                new_df = apply_spec_to_df(var_name, var_spec, self.df)
-                self.df = new_df
-            #update transforms metadata
-            self.transforms_metadata =  {**self.transforms_metadata, **transform_metadata_in}
-            #record operation in ops history
-            self.new_op("apply_transform_metadata", transform_metadata_in)
-            return self
+    def apply_transform_metadata(self, transform_metadata_in):
+        for var_name, var_spec in transform_metadata_in.items():
+            if self.y in var_spec[1]:
+                # y is being transformed thus add to transforms_y
+                self.add_y_transform(var_name)
+            new_df = apply_spec_to_df(var_name, var_spec, self.df)
+            self.df = new_df
+        #update transforms metadata
+        self.transforms_metadata =  {**self.transforms_metadata, **transform_metadata_in}
+        #record operation in ops history
+        self.new_op("apply_transform_metadata", transform_metadata_in)
+        return self
 
     #takes an array of variables you want to auto transform, and a new name for the dataset
     #this does not get recorded as a new op since it is dynamic; the underlying static apply_transform_metadata saves its ops instead
-    def auto_transform(self, auto_vars, new_ds=False, new_ds_name=""):
-        if new_ds:
-            new_ds = self.copy(new_ds_name)
-            new_ds.auto_transform(auto_vars)
-            return new_ds
-        else:
-            auto_transform_metadata = {}
-            for var in auto_vars:
-                var_data = self.df[var]
-                auto_spec = suggest_transform_fn(var_data, var)
-                auto_transform_metadata["auto_" + var] = auto_spec
-
-            ds = self.apply_transform_metadata(auto_transform_metadata)
-            return ds
-
+    def auto_transform(self, auto_vars):
+        auto_transform_metadata = {}
+        for var in auto_vars:
+            var_data = self.df[var]
+            auto_spec = suggest_transform_fn(var_data, var)
+            auto_transform_metadata["auto_" + var] = auto_spec
+        ds = self.apply_transform_metadata(auto_transform_metadata)
+        return ds
 
     # Data Analysis 
 
@@ -246,6 +300,7 @@ class Dataset(object):
     def impute_categories(self, category_cols):
         le_dict = impute_categories(self.df, category_cols)
         self.update_le_dict(le_dict)
+        self.set_category_cols(category_cols)
         self.new_op("apply_le_dict", category_cols, le_dict)
 
     def apply_le_dict(self, category_cols, le_dict):
@@ -268,6 +323,7 @@ class Dataset(object):
 
     def add_random_variables(self, random_variables):
         add_random_variables(self.df, self.y, random_variables)
+        self.random_variables = self.random_variables + random_variables
         self.new_op("add_random_variables", random_variables)
 
     def impute_conditions(self, conditions):
@@ -289,19 +345,14 @@ class Dataset(object):
 
     #fresh impute should create a new dataset and return it; no changes should happen to the original data
     def apply_imputations(self, category_cols, impute_to_mean, impute_to_value, remove_na_rows, 
-            blacklist, random_variables, conditions, new_ds=False, new_ds_name=""):
-        if new_ds:
-            new_ds = self.copy(new_ds_name)
-            new_ds.apply_imputations(category_cols, impute_to_mean, impute_to_value, remove_na_rows, blacklist, random_variables, conditions)
-            return new_ds
-        else:
-            self.impute_na_rows(remove_na_rows)
-            self.impute_conditions(conditions)
-            self.impute_blacklist(blacklist)
-            self.add_random_variables(random_variables)
-            self.impute_means(impute_to_mean)
-            self.impute_to_value(impute_to_value)
-            self.impute_categories(category_cols)
+            blacklist, random_variables, conditions):
+        self.impute_na_rows(remove_na_rows)
+        self.impute_conditions(conditions)
+        self.impute_blacklist(blacklist)
+        self.add_random_variables(random_variables)
+        self.impute_means(impute_to_mean)
+        self.impute_to_value(impute_to_value)
+        self.impute_categories(category_cols)
 
     def carry_along_split(self, carry_along):
         the_cols = self.df.columns.tolist()

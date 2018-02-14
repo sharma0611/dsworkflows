@@ -58,4 +58,111 @@ def hist_prob_plot(var_name, var_data):
              x=0.8,y=0.2)
     return fig2
 
+#dynamic fontsize function created specifically for seaborn factorplots
+def suggest_fontsize(num_bars):
+    m = -(8/15)
+    intercept = 19
+    fontsize = (num_bars * m) + intercept
+    if fontsize < 7:
+        fontsize = 7
+    if fontsize > 16:
+        fontsize = 16
+    return fontsize
+
+def bargraph_from_db(modeldb, x, y, seperate_by, hue=None, y_title=None):
+    if modeldb.empty:
+        return []
+
+    total_bars = len(modeldb[x].unique())
+    if total_bars > 15:
+        #seperate modeldb into current 15 & next whatever excess
+        curr_modeldb = modeldb.query(str(x) + " <= 15")
+        next_modeldb = modeldb.query(str(x) + " > 15")
+        curr_figs = bargraph_from_db(curr_modeldb, x, y, seperate_by, hue, y_title)
+        next_figs = bargraph_from_db(next_modeldb, x, y, seperate_by, hue, y_title)
+        return curr_figs + next_figs
+
+    #otherwise continue to create graph
+    g = sns.factorplot(data=modeldb, x=x, y=y, row=seperate_by, kind='bar', hue=hue, size=3, aspect=6, ci=None,
+                       legend=False)
+    g.set_titles("{row_name}")
+    if y_title:
+        g.set_axis_labels(str(x), y_title)
+
+    #calculating fontsize for bargraph based on # of bars
+    fontsize = suggest_fontsize(total_bars)
+    axes = g.axes.flat
+
+    #first make space for each axis, then add the legend
+    for ax in axes:
+        box = ax.get_position() # get position of figure
+        ax.set_position([box.x0, box.y0, box.width * 0.9, box.height]) # resize position
+        #now add a legend to the right most axes
+        ax.legend(loc='right', bbox_to_anchor=(1.12, 0.5), ncol=1)
+
+    #reload axes
+    axes = g.axes.flat
+    #annotate each bar
+    for ax in axes:
+        for p in ax.patches:
+            ax.annotate(str(p.get_height())[:5], (p.get_x() + (0 * p.get_width()), p.get_height() * 1.005),
+                        fontsize=fontsize)
+
+    return [g.fig]
+
+
+#function to graph importances from DF that has var column & other columns with importances
+#returns list of figures
+#an imp_df has the following form: one column is titled 'var' and has all variables, other columns 
+#    have importance values with the column title being the algo
+def feature_importance_bargraphs(imp_df, tag="", annotations=None):
+    #set autolayout to true to accomodate long var names
+    rcParams.update({'figure.autolayout': True})
+
+    all_figs = []
+    imp_cols = imp_df.columns.tolist()
+    imp_cols.remove("var")
+
+    #handling if too big
+    if len(imp_df) > 100:
+        for col in imp_cols:
+            #get max/min of column for scale
+            curr_max = imp_df[col].max()
+            curr_min = min(imp_df[col].min(), 0)
+            imp_df.sort_values(col, ascending=False, inplace=True)
+            #split into chunks of rows; each row is a variable
+            chunks = [imp_df[x:x+100] for x in range(0, len(imp_df), 100)]
+            for idx, chunk in enumerate(chunks):
+                y_title = col
+                g = sns.factorplot(x='var', y=col, data=chunk, size=7.5, aspect=2.3, kind='bar', ci=None)
+                g.set_xticklabels(rotation=45,ha='right')
+                #set titles for graph
+                axes = g.axes.flat
+                for ax in axes:
+                    ax.set_title(tag + " Feature Importances for " + col + " Part " + str(idx))
+                    ax.set_ylim([curr_min, curr_max])
+                    if annotations:
+                        ax.text(s=annotations, transform=ax.transAxes, x=0.9,y=0.8)
+                g.set_axis_labels("", y_title)
+                curr_fig = g.fig
+                all_figs = all_figs + [curr_fig]
+
+    else:
+        for col in imp_cols:
+            y_title = col
+            #fig,ax = plt.subplots()
+            imp_df = imp_df.sort_values(col, ascending=False)
+            g = sns.factorplot(x='var', y=col, data=imp_df, size=7.5, aspect=2.3, kind='bar')
+            g.set_xticklabels(rotation=45,ha='right')
+            #set titles for graph
+            axes = g.axes.flat
+            for ax in axes:
+                ax.set_title(tag + " Feature Importances for " + col)
+                if annotations:
+                    ax.text(s=annotations, transform=ax.transAxes, x=0.9,y=0.8)
+            g.set_axis_labels("", y_title)
+            curr_fig = g.fig
+            all_figs = all_figs + [curr_fig]
+
+    return all_figs
 

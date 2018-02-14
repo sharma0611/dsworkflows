@@ -109,3 +109,17 @@ def full_analysis(mydf, exportingdirectory, category_threshold=40):
 
     return categorical_vars, text_vars_na, number_cols_na
 
+#uses importances to generate importance table of variables
+def var_importance_table(importances, X, algo):
+    df = pd.DataFrame(columns=('var', algo+'_importance'))
+    for idx, i in enumerate(importances):
+        df.loc[idx] = [X[idx], i]
+    df = df.sort_values(algo+'_importance', ascending=False)
+    return df
+
+def safe_loc(df, indices):
+    curr_index = df.index.tolist()
+    use_index = list(set(curr_index).intersection(indices))
+    df = df.loc[use_index]
+    df.sort_index(inplace=True)
+    return df
