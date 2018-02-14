@@ -105,8 +105,21 @@ class Dataset(object):
     # copy a dataframe with all attributes; deepcopy of df and new name & directory for dataset
     def copy(self, new_name):
         copy_df = self.df.copy(deep=True)
-        copy_ds = Dataset(self.export_dir, self.name + "_" + new_name, copy_df)
-        copy_ds.apply_ops(self.op_history)
+        copy_ds = Dataset(self.export_dir, new_name, copy_df)
+
+        #init attributes
+        copy_ds.transforms_metadata = self.transforms_metadata 
+        copy_ds.transforms_y = self.transforms_y 
+        copy_ds.le_dict = self.le_dict 
+        copy_ds.impute_dict = self.impute_dict 
+        copy_ds.op_history = self.op_history 
+        copy_ds.tiling = self.tiling 
+        copy_ds.y = self.y 
+        copy_ds.carry_along = self.carry_along 
+        copy_ds.random_variables = self.random_variables 
+        copy_ds.garbage_features = self.garbage_features
+        copy_ds.X = self.X
+
         return copy_ds
 
     #function to load in the dataframe associated with the Dataset object
@@ -131,6 +144,14 @@ class Dataset(object):
 
     def get_X(self):
         return self.X
+
+    def get_non_X(self):
+        non_X = [self.y] + self.transforms_y + self.carry_along
+        return non_X
+
+    def get_non_y(self):
+        non_y = self.X + self.carry_along
+        return non_y
 
     def get_random_variables(self):
         return self.random_variables
@@ -301,7 +322,7 @@ class Dataset(object):
         le_dict = impute_categories(self.df, category_cols)
         self.update_le_dict(le_dict)
         self.set_category_cols(category_cols)
-        self.new_op("apply_le_dict", category_cols, le_dict)
+        self.new_op("impute_categories", category_cols)
 
     def apply_le_dict(self, category_cols, le_dict):
         apply_le_dict(self.df, category_cols, le_dict)
@@ -322,8 +343,9 @@ class Dataset(object):
         self.new_op("impute_blacklist", blacklist)
 
     def add_random_variables(self, random_variables):
-        add_random_variables(self.df, self.y, random_variables)
-        self.random_variables = self.random_variables + random_variables
+        add_random_variables(self.df, self.y, random_variables) # add them to df
+        self.random_variables = self.random_variables + random_variables # update random variables
+        self.X = self.X + random_variables #update X
         self.new_op("add_random_variables", random_variables)
 
     def impute_conditions(self, conditions):
@@ -361,7 +383,32 @@ class Dataset(object):
         #add carry along attribute
         self.carry_along = self.carry_along + carry_along
         #remove carry along from X
-        X = self.X
-        self.X = list(set(X) - set(carry_along))
+        self.X = list(set(self.X) - set(carry_along))
         self.new_op("carry_along_split", carry_along)
 
+    def prune_features(self, new_X, keep_random_vars=False):
+        curr_cols = self.X
+        not_included = set(new_X) - set(curr_cols)
+        if len(not_included) > 0:
+            print("You are trying to select columns that do not exist in the current dataframe.")
+            print("These cols are: {0}".format(str(not_included)))
+        include = list(set(new_X).intersection(curr_cols))
+        print("Selecting the following {0} of {1} columns in the dataframe...".format(len(include),
+                                                                                      len(curr_cols)))
+        print("Now there are only {0} intersection columns in the dataframe".format(len(include)))
+        self.X = include
+        include = include + self.get_non_X()
+        if keep_random_vars:
+            include = list(set(include + self.random_variables))
+        self.df = self.df[include]
+        self.new_op("prune_features", new_X, keep_random_vars)
+
+    def prune_y(self, select_y):
+        if select_y in self.transforms_y:
+            self.y = select_y
+        assert self.y == select_y
+        self.transforms_y = []
+        include = [select_y] + self.get_non_y()
+        print(include)
+        self.df = self.df[include]
+        self.new_op("prune_y", select_y)

@@ -30,7 +30,7 @@ import lightgbm as lgb
 
 #Instantiate Dataset Manager & load dataset object
 dsm = Dataset_Manager(export_dir)
-ds = dsm.load_dataset("raw_impute")
+ds = dsm.load_dataset("impute")
 ds.load_df()
 
 #Instantiate Model Manager
@@ -215,3 +215,5 @@ file2 = export_dir + '/prelim_model_summary.pdf'
 outfile = export_dir + '/prelim_report.pdf'
 join_pdfs(file1, file2, outfile)
 
+#save dataset changes
+ds.save()

@@ -2,3 +2,4 @@
 python 1_initialanalysis.py
 python 2_imputedata.py
 python 3_prelimmodels.py
+python 4_dataprune.py

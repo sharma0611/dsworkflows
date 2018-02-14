@@ -48,7 +48,6 @@ ds.analyse_target_distribution()
 
 #Save the dataset
 print("Saving your dataset...")
-print(ds.X)
 ds.save()
 
 print("Initial Analysis Complete.")
