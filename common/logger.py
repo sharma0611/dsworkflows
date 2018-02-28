@@ -63,11 +63,6 @@ def join_pdfs_list(infile_list, output_path, delete_original=True):
         for file_path in infile_list:
             os.remove(file_path)
 
-#def get_value(key, interval_dict, default=[]):
-
-
-
-
 
 #Usage
 #writeprints = True

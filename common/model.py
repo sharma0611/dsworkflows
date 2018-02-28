@@ -12,7 +12,7 @@ Purpose: Hosts the Model object & its functions to interact with model propertie
 """
 from common.utils import ensure_folder, save_obj, load_obj
 from common.multivariateanalysis import var_importance_table
-from common.modelanalysis import r2_mse_grab
+from common.modelanalysis import r2_mse_grab, train_test_confusion_plot_full
 
 class Model(object):
     """ 
@@ -62,6 +62,8 @@ class Model(object):
         self.X = X
         self.num_features = len(X)
         self.train_time_mins = 0
+        self.imp_df = None
+        self.ordered_ftrs = None
 
         #init model_object
         self.model_object = model_object
@@ -100,6 +102,9 @@ class Model(object):
     def get_X(self):
         return self.X
 
+    def get_importance_df(self):
+        return self.imp_df
+
     # Setters
     def set_metadata_with_dataset(self, dataset):
         train_shape = (dataset.get_train_X_shape()[0], self.num_features)
@@ -114,9 +119,11 @@ class Model(object):
     def set_training_time(self, train_time_mins):
         self.train_time_mins = train_time_mins
 
+    def set_metadata_feature(self, feature_name, value):
+        self.__dict__[feature_name] = value
+
     def set_importance_df(self, importances):
-        importance_column_name = self.model_algo + "_" + self.tag
-        imp_df = var_importance_table(importances, self.X, importance_column_name)
+        imp_df = var_importance_table(importances, self.X, self.name)
         #set importance df
         self.imp_df = imp_df
         ordered_ftrs = imp_df['var'].values
@@ -140,4 +147,16 @@ class Model(object):
         self.r2_train = r2_train
         self.mse_test = mse_test
         self.mse_train = mse_train
+        self.test_y_pred = test_y_pred
+        self.train_y_pred = train_y_pred
+
+    def confusion_matrix(self, ds):
+        test_y_arr, train_y_arr = ds.get_test_train_var_arrays(self.y)
+        transform_spec = ds.get_transforms_metadata()
+        try:
+            transform_spec = transform_spec[y_label]
+        except:
+            transform_spec = False
+        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, False, transform_spec)
+        return fig_arr
 

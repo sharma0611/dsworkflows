@@ -10,6 +10,13 @@ from common.utils import ensure_folder, fetch_db, save_obj, load_obj
 from common.model import Model
 import re
 from functools import reduce
+
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+import lightgbm as lgb
+from time import time
+
+import warnings
+
 #Sample Model Metadata
 #    
 #    Rule: You must use given functions to create a modelname & number
@@ -30,7 +37,6 @@ from functools import reduce
 #                  'train_acc': train_acc}
 
 modeldb_path = "./modeldb.pk"
-
 
 class Model_Manager(object):
 
@@ -94,6 +100,11 @@ class Model_Manager(object):
         #reset live models
         self.live_models = []
 
+    def grab_all_models_metadata_df(self):
+        self.load_all_models()
+        df = self.grab_live_models_metadata_df()
+        return df
+
     # Live Models Functions
     # functions that operate on all models you created during runtime of model manager
 
@@ -134,6 +145,10 @@ class Model_Manager(object):
         self.metadata_df = df
         return df
 
+    def set_metadata_feature_live_models(self, feature_name, value):
+        for model in self.live_models:
+            model.set_metadata_feature(feature_name, value)
+
     def r2_test_live_models(self, ds):
         for model in self.live_models:
             model.r2_test(ds)
@@ -149,7 +164,108 @@ class Model_Manager(object):
         else:
             master_imp_df = pd.DataFrame()
         return master_imp_df
-        
+
+    # default model creation functions
+    
+    def create_rf_model(self, ds, X_arr, y_arr, y, X, step_tag, update_params=False):
+        print("RF Model for " + y)
+        t1 = time()
+        params = {'n_estimators': 300, 'max_depth': 4, 'min_samples_split': 4,
+                  'n_jobs':-1, 'random_state': 120}
+        if update_params:
+            params.update(update_params)
+
+        rf_model_object = RandomForestRegressor(**params)
+        rf_model_object.fit(X_arr, y_arr)
+
+        #save model in Model object
+        model_algo = "rf"
+        model_name = step_tag + "_" + model_algo
+        rf_model = self.create_model(model_name, rf_model_object, y, X, model_algo, params, step_tag)
+        rf_model.set_metadata_with_dataset(ds)
+
+        #get ordered list of important features
+        importances = rf_model_object.feature_importances_
+        rf_model.set_importance_df(importances)
+
+        #calculate time
+        t2 = time()
+        t = (t2-t1)/60
+        rf_model.set_training_time(t) #record time it took
+        print("RF complete in " + '{0:.2f}'.format(t) + "m.")
+
+        return rf_model
+
+    def create_gbr_model(self, ds, X_arr, y_arr, y, X, step_tag, update_params=False):
+        print("GBR Model for " + y)
+        t1 = time()
+        params = {'n_estimators': 300, 'max_depth': 4, 'min_samples_split': 4,
+                  'learning_rate': 0.1, 'loss': 'ls', 'random_state': 912}
+        if update_params:
+            params.update(update_params)
+        gbr_model_object = GradientBoostingRegressor(**params)
+        gbr_model_object.fit(X_arr, y_arr)
+
+        #save this model for later analysis
+        model_algo = 'gbr'
+        model_name = step_tag + "_" + model_algo
+        gbr_model = self.create_model(model_name, gbr_model_object, y, X, model_algo, params, step_tag)
+        gbr_model.set_metadata_with_dataset(ds)
+
+        #output importances
+        importances = gbr_model_object.feature_importances_
+        gbr_model.set_importance_df(importances)
+
+        #calculate time
+        t2 = time()
+        t = (t2-t1)/60
+        gbr_model.set_training_time(t)
+        print("GBR complete in " + '{0:.2f}'.format(t) + "m.")
+
+        return gbr_model
+
+    def create_lgbm_model(self, ds, X_arr, y_arr, y, X, step_tag, eval_set=None, update_params=False):
+        print("Microsoft LightGBM Model for " + y)
+        t1 = time()
+        params = {
+            'boosting_type': 'gbdt',
+            'num_leaves': 31,
+            'learning_rate': 0.1,
+            'n_estimators': 300,
+            'seed': 1231,
+        }
+        if update_params:
+            params.update(update_params)
+
+        gbm_model_object = lgb.LGBMRegressor(**params)
+        category_cols = ds.get_category_cols(X)
+        warnings.filterwarnings("ignore")
+        gbm_model_object.fit(X_arr, y_arr,
+                eval_metric='l2',
+                eval_set=eval_set,
+                early_stopping_rounds=5,
+                categorical_feature=category_cols,
+                feature_name=X,
+                verbose=False)
+
+        #save this model for later analysis
+        model_algo = 'lgbm'
+        model_name = step_tag + "_" + model_algo
+        gbm_model = self.create_model(model_name, gbm_model_object, y, X, model_algo, params, step_tag)
+        gbm_model.set_metadata_with_dataset(ds)
+
+        #output importances
+        importances = gbm_model_object.feature_importances_
+        gbm_model.set_importance_df(importances)
+
+        #calculate time
+        t2 = time()
+        t = (t2-t1)/60
+        gbm_model.set_training_time(t)
+        print("LightGBM complete in " + '{0:.2f}'.format(t) + "m.")
+
+        return gbm_model
+
 
 def load_modeldb(path_to_db=modeldb_path):
     if os.path.isfile(path_to_db):

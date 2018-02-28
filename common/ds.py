@@ -20,6 +20,8 @@ from common.imputations import (impute_categories, apply_le_dict, get_means, imp
         add_random_variables, impute_conditions, impute_to_value)
 from copy import deepcopy
 from numpy import array
+import os
+import shutil
 
 
 class Dataset(object):
@@ -63,10 +65,13 @@ class Dataset(object):
         self.tiling = {}
         self.y = None
         self.carry_along = []
+        self.category_cols = []
         self.test_df = None
         self.train_df = None
         self.random_variables = []
         self.garbage_features = {}
+        self.train_i = None
+        self.test_i = None
 
         #init dataframe
         self.df = df
@@ -116,9 +121,12 @@ class Dataset(object):
         copy_ds.tiling = self.tiling 
         copy_ds.y = self.y 
         copy_ds.carry_along = self.carry_along 
+        copy_ds.category_cols = self.category_cols
         copy_ds.random_variables = self.random_variables 
         copy_ds.garbage_features = self.garbage_features
         copy_ds.X = self.X
+        copy_ds.train_i = self.train_i
+        copy_ds.test_i = self.test_i
 
         return copy_ds
 
@@ -128,6 +136,26 @@ class Dataset(object):
     def load_df(self):
         df = load_obj(self.dataframe_path)
         self.df = df
+
+    def make_custom_dir(self, dir_name, overwrite):
+        custom_dir = self.export_dir + "/" + dir_name
+        curr_dir = custom_dir
+        if not overwrite:
+            id = 0 
+            while(os.path.isdir(curr_dir)):
+                curr_dir = custom_dir + "_" + str(id)
+                id += 1
+        else:
+            #to overwrite clear directory first
+            shutil.rmtree(curr_dir)
+        ensure_folder(curr_dir)
+        return curr_dir
+
+    def get_custom_dir(self, dir_name, id=False):
+        curr_dir = self.export_dir + "/" + dir_name
+        if id:
+            curr_dir = curr_dir + "_" + str(id) 
+        return curr_dir
 
     # Getters
     def get_name(self):
@@ -145,6 +173,9 @@ class Dataset(object):
     def get_X(self):
         return self.X
 
+    def get_y(self):
+        return self.y
+
     def get_non_X(self):
         non_X = [self.y] + self.transforms_y + self.carry_along
         return non_X
@@ -160,8 +191,16 @@ class Dataset(object):
         garbage_ftrs = self.garbage_features[y]
         return garbage_ftrs
 
-    # Setters
+    def get_category_cols(self, X):
+        return list(set(self.category_cols).intersection(X))
 
+    def get_categorical_bool(self, X=False):
+        if not X:
+            X = self.X
+        categorical_bool = [True if x in self.category_cols else False for x in X]
+        return categorical_bool
+
+    # Setters
     def set_target(self, y):
         assert y in self.X
         self.y = y
@@ -396,7 +435,9 @@ class Dataset(object):
         print("Selecting the following {0} of {1} columns in the dataframe...".format(len(include),
                                                                                       len(curr_cols)))
         print("Now there are only {0} intersection columns in the dataframe".format(len(include)))
+        #reset X, category_cols
         self.X = include
+        self.category_cols = list(set(self.category_cols).intersection(include))
         include = include + self.get_non_X()
         if keep_random_vars:
             include = list(set(include + self.random_variables))

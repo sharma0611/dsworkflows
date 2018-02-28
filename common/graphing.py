@@ -8,6 +8,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set(style="darkgrid")
 
+#function to return axis & figures for boxplots
+def grab_new_ax_array():
+    boxplot_fig = plt.figure(figsize=(8, 17))
+    gs1 = gridspec.GridSpec(5, 1)
+    ax1 = boxplot_fig.add_subplot(gs1[0])
+    ax2 = boxplot_fig.add_subplot(gs1[1])
+    ax3 = boxplot_fig.add_subplot(gs1[2])
+    ax4 = boxplot_fig.add_subplot(gs1[3])
+    ax5 = boxplot_fig.add_subplot(gs1[4])
+    ax_array1 = [ax1, ax2, ax3, ax4, ax5]
+    return gs1, boxplot_fig, ax_array1
+
 def figures_to_pdf(fig_list, pdf_path):
     pdf = matplotlib.backends.backend_pdf.PdfPages(pdf_path)
     for fig in fig_list:
@@ -165,4 +177,34 @@ def feature_importance_bargraphs(imp_df, tag="", annotations=None):
             all_figs = all_figs + [curr_fig]
 
     return all_figs
+
+def linegraph_from_db(modeldb, x, y):
+    g = sns.FacetGrid(modeldb, size=4)
+    g = g.map(sns.pointplot, x, y)
+    return g.fig
+
+def paint_declines_red(g):
+    axes = g.axes.flat
+    for ax in axes:
+        patch_list = ax.patches
+        for first, second in zip(patch_list, patch_list[1:]):
+            next_height = second.get_height()
+            curr_height = first.get_height()
+            curr_diff = next_height - curr_height
+            if curr_diff < 0:
+                second.set_facecolor('red')
+                ax.annotate(str(round(curr_diff, 2)),(second.get_x() + (0.25 * second.get_width()), second.get_height() * 1.005))
+    return g
+
+def bargraph_fsa(mydf, y, title, paint_red_declines=False):
+    rcParams.update({'figure.autolayout': True})
+    g = sns.factorplot(data=mydf, x='var', y=y, col=None , kind='bar', size=4, aspect=3, ci=None)
+    g.set_xticklabels(rotation=45,ha='right')
+    axes = g.axes.flat
+    for ax in axes:
+        ax.set_title(title)
+    if paint_red_declines:
+        g = paint_declines_red(g)
+    return g.fig
+
 

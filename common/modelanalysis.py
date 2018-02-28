@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import seaborn as sns
 
+from common.univariateanalysis import apply_spec_to_df
+
 #Sample Model Metadata
 #
 #    Rule: You must use given functions to create a modelname & number
@@ -60,17 +62,6 @@ def ordered_subset(preserve_order_list, cut_list):
     new.sort(key=d.get)
     return new
 
-#function to return axis & figures for boxplots
-def grab_new_ax_array():
-    boxplot_fig = plt.figure(figsize=(8, 17))
-    gs1 = gridspec.GridSpec(5, 1)
-    ax1 = boxplot_fig.add_subplot(gs1[0])
-    ax2 = boxplot_fig.add_subplot(gs1[1])
-    ax3 = boxplot_fig.add_subplot(gs1[2])
-    ax4 = boxplot_fig.add_subplot(gs1[3])
-    ax5 = boxplot_fig.add_subplot(gs1[4])
-    ax_array1 = [ax1, ax2, ax3, ax4, ax5]
-    return gs1, boxplot_fig, ax_array1
 
 def mse_r2_perf_output(actual_y, pred_y, title, fig=None, ax=None):
 
@@ -366,10 +357,6 @@ def r2_compare(modeldb_path, impute_dir, y, exportpath=None, SpecialTag=None):
 
     #save_obj(modeldb, modeldb_path)
 
-try:
-    from .datainteract import apply_spec_to_df
-except:
-    apply_spec_to_df = False
 
 #CODE TO MAKE A CONFUSION MATRIX
 def train_test_confusion_plot_full(predicted_train, predicted_test, actual_train, actual_test, y, curr_tile,
