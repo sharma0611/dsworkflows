@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.backends.backend_pdf
 from matplotlib import rcParams
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import seaborn as sns
 sns.set(style="darkgrid")
 

@@ -6,11 +6,12 @@
 
 from common.dsm import Dataset_Manager
 from common.mm import Model_Manager
-from config.config import export_dir, dataset_chosen, round_chosen, fs_step, fsa_step, fsa_overwrite, fs_id
-from common.logger import start_printer, end_printer, join_pdfs
+from config.config import export_dir, dataset_chosen, round_chosen, fs_step, fsa_step, fsa_overwrite, fs_id, force_add_features
+from common.logger import start_printer, end_printer, join_pdfs, join_pdfs_list
 from common.utils import ensure_folder, save_obj, load_obj
 from common.graphing import (bargraph_from_db, feature_importance_bargraphs, figures_to_pdf, 
         bargraph_fsa, grab_new_ax_array)
+from common.featureanalysis import grab_all_features
 
 import pandas as pd
 from time import time
@@ -56,9 +57,6 @@ if not round_chosen:
         rounds_nums = [int(x) for x in rounds_num]
         round_chosen = max(rounds_nums)
 
-#load subset chosen
-ds = Dataset.load_dataset(dataset_chosen)
-ds.load_raw()
 
 #getting import directory for step 5 results
 fs_dir = ds.get_custom_dir(fs_step, fs_id)
@@ -114,7 +112,7 @@ if idp:
     independent_results = []
     for ftr in important_features:
         #take the X of one feature for test & train
-        curr_test_X_arr, curr_train_X_arr = ds.get_test_train_X_arrays(ftr)
+        curr_test_X_arr, curr_train_X_arr = ds.get_test_train_X_arrays([ftr])
 
         #create the model
         eval_set = [(curr_test_X_arr, test_y_arr)]
@@ -158,7 +156,7 @@ imp_figs = feature_importance_bargraphs(imp_df, "", annot)
 imp_df.to_csv(fsa_dir + '/main_importances.csv')
 topfour_imp = imp_df["var"][:4].values.tolist()
 
-main_model_graphs_path = fsanalysis_dir + '/main_graphs.pdf'
+main_model_graphs_path = fsa_dir + '/main_graphs.pdf'
 figures_to_pdf(main_model_fig_arr + imp_figs, main_model_graphs_path)
 paths_to_be_joined.append(main_model_graphs_path)
 
@@ -184,24 +182,24 @@ if dep:
         #predict & metrics
         lgbm_model.r2_test(ds)
 
-        r2_test_diff = master_r2_test - lgbm_model.r2_test
-        mse_test_diff = master_mse_test - lgbm_model.mse_test
-        r2_train_diff = master_r2_train - lgbm_model.r2_train
-        mse_train_diff = master_mse_train - lgbm_model.mse_train
+        r2_test_diff = master_lgbm_model.r2_test - lgbm_model.r2_test
+        mse_test_diff = master_lgbm_model.mse_test - lgbm_model.mse_test
+        r2_train_diff = master_lgbm_model.r2_train - lgbm_model.r2_train
+        mse_train_diff = master_lgbm_model.mse_train - lgbm_model.mse_train
 
         #append results to list
         results = {"mse_train_diff": mse_train_diff,
                    "r2_train_diff": r2_train_diff,
                    "mse_test_diff": mse_test_diff,
                    "r2_test_diff":r2_test_diff,
-                   "discarded_var":ftr}
+                   "var":ftr}
 
         dep_results.append(results)
 
     #create dependent predictive power dataframe
     dep_results_df = pd.DataFrame(dep_results)
     dep_results_df.sort_values('r2_test_diff', ascending=False, inplace=True)
-    topfour_dep = dep_results_df['discarded_var'][:4].values.tolist()
+    topfour_dep = dep_results_df['var'][:4].values.tolist()
     dep_fig1 = bargraph_fsa(dep_results_df, 'r2_test_diff', 'Dependent Learner: r2 loss from variable omit')
     dep_fig2 = bargraph_fsa(dep_results_df, 'r2_train_diff', 'Dependent Learner: r2 loss from variable omit')
     dep_graph_path = fsa_dir + '/dep_graphs.pdf'
@@ -228,13 +226,13 @@ if marg:
         eval_set = [(curr_test_X_arr, test_y_arr)]
         lgbm_model = mm.create_lgbm_model(ds, curr_train_X_arr, train_y_arr, y, curr_ftrs, fsa_step, eval_set)
         lgbm_model.set_metadata_feature('added_var', ftr)
-
-    mm.r2_test_live_models(ds)
+        lgbm_model.r2_test(ds)
 
     #create marginal predictive power dataframe
     marg_results_df = mm.grab_live_models_metadata_df()
-    marg_fig1 = bargraph_fsa(marg_results_df, 'test_r2', 'Marginal Learner: r2 as features are added', True)
-    marg_fig2 = bargraph_fsa(marg_results_df, 'train_r2', 'Marginal Learner: r2 as features are added', True)
+    marg_results_df.rename(columns={"added_var": "var"}, inplace=True)
+    marg_fig1 = bargraph_fsa(marg_results_df, 'r2_test', 'Marginal Learner: r2 as features are added', True)
+    marg_fig2 = bargraph_fsa(marg_results_df, 'r2_train', 'Marginal Learner: r2 as features are added', True)
     marg_graph_path = fsa_dir + '/marg_graphs.pdf'
     figures_to_pdf([marg_fig1, marg_fig2], marg_graph_path)
     paths_to_be_joined.append(marg_graph_path)
@@ -243,8 +241,8 @@ print("finished marg models")
 
 # Models complete.
 # Begin variable analysis using various visualizations.
-take = important_features + [y_label]
-sel_df = test_df[take]
+take = important_features + [y]
+sel_df = ds.test_df[take]
 
 #Box Plot
 #first sort by maximum values for boxplot
@@ -338,8 +336,8 @@ if len(sel_df) > 50000:
 for x in important_features:
     #curr_fig = plt.figure(figsize=(8, 8))
     #curr_ax = curr_fig.add_subplot()
-    trim_data = sel_df[[y_label, x]]
-    g = sns.JointGrid(x=x, y=y_label, data=trim_data)
+    trim_data = sel_df[[y, x]]
+    g = sns.JointGrid(x=x, y=y, data=trim_data)
     try:
         g.plot_joint(sns.kdeplot)
     except:
@@ -349,7 +347,7 @@ for x in important_features:
     ax_dist = fig_dist.add_subplot(111)
     ax_dist.set_title("Distribution of " + x)
     trim_data[x].hist(ax=ax_dist, rasterized=True)
-    #g = sns.jointplot(x, y_label, data=trim_data, kind="kde")
+    #g = sns.jointplot(x, y, data=trim_data, kind="kde")
     joint_figures.append(g.fig)
     joint_figures.append(fig_dist)
 
@@ -358,11 +356,10 @@ figures_to_pdf(joint_figures, joint_graph_path)
 paths_to_be_joined.append(joint_graph_path)
 
 #shutdown logging
-if write_reports:
-    end_printer(fsa_dir, fname)
-    #combine this file with the other graphs as well
-    file1 = fsa_dir + '/' + fname + '.pdf'
-    outfile = fsa_dir + '/fs_analysis_report.pdf'
-    paths_to_be_joined = [file1] + paths_to_be_joined
-    join_pdfs_list(paths_to_be_joined, outfile, True)
+end_printer(fsa_dir, fname)
+#combine this file with the other graphs as well
+file1 = fsa_dir + '/' + fname + '.pdf'
+outfile = fsa_dir + '/fs_analysis_report.pdf'
+paths_to_be_joined = [file1] + paths_to_be_joined
+join_pdfs_list(paths_to_be_joined, outfile, True)
 

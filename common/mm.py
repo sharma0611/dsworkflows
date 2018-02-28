@@ -225,6 +225,7 @@ class Model_Manager(object):
         return gbr_model
 
     def create_lgbm_model(self, ds, X_arr, y_arr, y, X, step_tag, eval_set=None, update_params=False):
+        assert X_arr.shape[1] == len(X)
         print("Microsoft LightGBM Model for " + y)
         t1 = time()
         params = {
@@ -246,7 +247,7 @@ class Model_Manager(object):
                 early_stopping_rounds=5,
                 categorical_feature=category_cols,
                 feature_name=X,
-                verbose=False)
+                verbose=-1)
 
         #save this model for later analysis
         model_algo = 'lgbm'
@@ -266,6 +267,8 @@ class Model_Manager(object):
 
         return gbm_model
 
+
+### DEPRECATED FN's, delete after finished migrations to object oriented
 
 def load_modeldb(path_to_db=modeldb_path):
     if os.path.isfile(path_to_db):

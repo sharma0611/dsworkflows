@@ -157,6 +157,7 @@ class Model(object):
             transform_spec = transform_spec[y_label]
         except:
             transform_spec = False
-        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, False, transform_spec)
+        curr_tile = ds.tile_func
+        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, curr_tile, transform_spec)
         return fig_arr
 

@@ -138,10 +138,10 @@ class Dataset(object):
         self.df = df
 
     def make_custom_dir(self, dir_name, overwrite):
-        custom_dir = self.export_dir + "/" + dir_name
+        custom_dir = self.curr_dataset_dir + "/" + dir_name
         curr_dir = custom_dir
         if not overwrite:
-            id = 0 
+            id = 1
             while(os.path.isdir(curr_dir)):
                 curr_dir = custom_dir + "_" + str(id)
                 id += 1
@@ -152,7 +152,7 @@ class Dataset(object):
         return curr_dir
 
     def get_custom_dir(self, dir_name, id=False):
-        curr_dir = self.export_dir + "/" + dir_name
+        curr_dir = self.curr_dataset_dir + "/" + dir_name
         if id:
             curr_dir = curr_dir + "_" + str(id) 
         return curr_dir
@@ -199,6 +199,9 @@ class Dataset(object):
             X = self.X
         categorical_bool = [True if x in self.category_cols else False for x in X]
         return categorical_bool
+
+    def get_transforms_metadata(self):
+        return self.transforms_metadata
 
     # Setters
     def set_target(self, y):
