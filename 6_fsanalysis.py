@@ -33,10 +33,6 @@ mm = Model_Manager(export_dir)
 #start timing
 t1_main = time()
 
-#start logging
-fname = "fs_analysis"
-start_printer(export_dir, fname)
-
 #load test/train in dataset object
 ds.load_test_train_dfs()
 
@@ -48,7 +44,7 @@ y = ds.get_y()
 if not round_chosen:
     #find the last round
     modeldf = mm.grab_all_models_metadata_df()
-    modeldf_subset = modeldf.query("round > 0 & dataset_name == " + str(dataset_chosen))
+    modeldf_subset = modeldf.query("round > 0 & dataset_name == '" + str(dataset_chosen) + "'")
     if modeldf_subset.empty:
         #step 5 has not been run yet; default to entire subset
         round_chosen = False

@@ -18,6 +18,7 @@ from common.multivariateanalysis import full_analysis, safe_loc
 from common.graphing import figures_to_pdf, hist_prob_plot, histogram_boxcox_plot
 from common.imputations import (impute_categories, apply_le_dict, get_means, impute_na_rows, impute_blacklist, 
         add_random_variables, impute_conditions, impute_to_value)
+from common.transforms import inverse_dictionary
 from copy import deepcopy
 from numpy import array
 import os
@@ -202,6 +203,25 @@ class Dataset(object):
 
     def get_transforms_metadata(self):
         return self.transforms_metadata
+
+    def get_transform_spec(self, var):
+        try:
+            spec = self.transforms_metadata[var]
+        except:
+            spec = ('original', [var], {}, -999)
+        return spec
+
+    def get_reverse_transform_spec(self, var):
+        transform_spec = self.get_transform_spec(var)
+        transform_chosen = transform_spec[0]
+        reverse_transform = inverse_dictionary[transform_chosen]
+        try:
+            default_val = transform_spec[3]
+        except:
+            default_val = -999
+        rev_transform_spec = (reverse_transform, [var], transform_spec[2], default_val)
+        rev_var_name = transform_spec[1]
+        return rev_var_name, rev_transform_spec
 
     # Setters
     def set_target(self, y):
@@ -453,6 +473,5 @@ class Dataset(object):
         assert self.y == select_y
         self.transforms_y = []
         include = [select_y] + self.get_non_y()
-        print(include)
         self.df = self.df[include]
         self.new_op("prune_y", select_y)

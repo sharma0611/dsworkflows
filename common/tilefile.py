@@ -24,10 +24,9 @@ def create_tiling(y_data, num_tiles):
 
 #tiling is a dictionary of {tiles: upper bounds}
 def ntile(val, tiling):
-    if val is None:
+    if val is None or pd.isnull(val):
         return -1
     for tile, upper_bound in tiling.items():
         if val <= upper_bound:
             return tile
     return len(tiling) + 1
-

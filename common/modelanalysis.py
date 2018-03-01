@@ -27,6 +27,7 @@ import matplotlib.gridspec as gridspec
 import seaborn as sns
 
 from common.univariateanalysis import apply_spec_to_df
+from common.transforms import inverse_dictionary
 
 #Sample Model Metadata
 #
@@ -359,18 +360,8 @@ def r2_compare(modeldb_path, impute_dir, y, exportpath=None, SpecialTag=None):
 
 
 #CODE TO MAKE A CONFUSION MATRIX
-def train_test_confusion_plot_full(predicted_train, predicted_test, actual_train, actual_test, y, curr_tile,
-                                   full_dist=False, transform_spec=False):
-    if not transform_spec:
-        transform_spec = ('original', [y], {}, -999)
-        rev_transform_spec = transform_spec
-    else:
-        transform_chosen = transform_spec[0]
-        reverse_transform = inverse_dictionary[transform_chosen]
-
-        if reverse_transform:
-            rev_transform_spec = (reverse_transform, transform_spec[1], transform_spec[2], transform_spec[3])
-
+def train_test_confusion_plot_full(predicted_train, predicted_test, actual_train, actual_test, y, curr_tile, rev_transform_spec, full_dist=True):
+                                   
     pred_train_df = pd.DataFrame({y: predicted_train})
     pred_train_df = apply_spec_to_df(y, rev_transform_spec, pred_train_df)
     predicted_train_tile = pred_train_df[y].apply(curr_tile)

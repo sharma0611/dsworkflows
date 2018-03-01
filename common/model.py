@@ -152,12 +152,8 @@ class Model(object):
 
     def confusion_matrix(self, ds):
         test_y_arr, train_y_arr = ds.get_test_train_var_arrays(self.y)
-        transform_spec = ds.get_transforms_metadata()
-        try:
-            transform_spec = transform_spec[y_label]
-        except:
-            transform_spec = False
+        reverse_var, reverse_transform_spec = ds.get_reverse_transform_spec(self.y)
         curr_tile = ds.tile_func
-        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, curr_tile, transform_spec)
+        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, curr_tile, reverse_transform_spec)
         return fig_arr
 
