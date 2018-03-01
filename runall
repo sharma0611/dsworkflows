@@ -5,3 +5,4 @@ python 3_prelimmodels.py
 python 4_dataprune.py
 python 5_featureselection.py
 python 6_fsanalysis.py
+python 7_modelcreation.py

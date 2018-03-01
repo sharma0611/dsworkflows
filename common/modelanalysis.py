@@ -29,25 +29,6 @@ import seaborn as sns
 from common.univariateanalysis import apply_spec_to_df
 from common.transforms import inverse_dictionary
 
-#Sample Model Metadata
-#
-#    Rule: You must use given functions to create a modelname & number
-#    model_dict = {'FullPath': model_path,
-#                  'ModelName': model_name,
-#                  'ModelNum': model_num,
-#                  'ModelAlgo': model_algo,
-#                  'TransformTag': transform,
-#                  'SpecialTag': special_tag,
-#                  'TrainingDataShape': shape,
-#                  'NumberFeaturesUsed': len(X),
-#                  'FeaturesUsed': str(features_used),
-#                  'test_r2': test_r2,
-#                  'test_mse': test_mse,
-#                  'test_accuracy': test_acc,
-#                  'train_r2': train_r2,
-#                  'train_mse': train_mse,
-#                  'train_acc': train_acc}
-
 #metrics
 def insert_random_var(seed, new_var, dataframe):
     """Function to insert random variable into Pandas DataFrame.
@@ -275,8 +256,6 @@ def model_metrics_sklearn(clf, estimators, actual_test_y, test_X, tag):
 
 #getting an r2 from model
 def r2_model():
-
-
     #all output columns in dataframe
     y_pattern = ".*_" + str(y) + '$'
     r = re.compile(y_pattern)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-@author: cih745
+    Shivam Sharma
+    @sharma0611
 """
 
 import os
@@ -16,6 +17,17 @@ import lightgbm as lgb
 from time import time
 
 import warnings
+
+from common.univariateanalysis import apply_spec_to_df
+import sklearn.metrics as metrics
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics.scorer import make_scorer
+import scipy
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from config.config import gs_iterations
 
 #Sample Model Metadata
 #    
@@ -241,14 +253,19 @@ class Model_Manager(object):
         gbm_model_object = lgb.LGBMRegressor(**params)
         category_cols = ds.get_category_cols(X)
         warnings.filterwarnings("ignore")
-        gbm_model_object.fit(X_arr, y_arr,
-                eval_metric='l2',
-                eval_set=eval_set,
-                early_stopping_rounds=5,
-                categorical_feature=category_cols,
-                feature_name=X,
-                verbose=-1)
-
+        try:
+            gbm_model_object.fit(X_arr, y_arr,
+                    eval_metric='l2',
+                    eval_set=eval_set,
+                    early_stopping_rounds=5,
+                    categorical_feature=category_cols,
+                    feature_name=X,
+                    verbose=-1)
+        except:
+            gbm_model_object.fit(X_arr, y_arr,
+                    categorical_feature=category_cols,
+                    feature_name=X,
+                    verbose=-1)
         #save this model for later analysis
         model_algo = 'lgbm'
         model_name = step_tag + "_" + model_algo
@@ -267,194 +284,73 @@ class Model_Manager(object):
 
         return gbm_model
 
+    def regression_gridsearch_lgbm(self, ds, X, X_arr, y_arr):
+        category_cols = ds.get_category_cols(X)
 
-### DEPRECATED FN's, delete after finished migrations to object oriented
+        scoring = {"Accuracy": make_scorer(ds.custom_accuracy, greater_is_better=True),
+                   "Explained_Variance": make_scorer(metrics.explained_variance_score, greater_is_better=True),
+                   "r2_score": make_scorer(metrics.r2_score, greater_is_better=True)}
 
-def load_modeldb(path_to_db=modeldb_path):
-    if os.path.isfile(path_to_db):
-        models_df = load_obj(path_to_db)
-    else:
-        models_df = pd.DataFrame()
-    return models_df
+        params_distr = {'learning_rate': scipy.stats.expon(scale=0.1),
+                        'n_estimators': scipy.stats.randint(50, 400),
+                        'max_depth': scipy.stats.randint(3, 15), 
+                        'num_leaves': [5,10,20,30,40]}
 
-def update_base_paths_db(db, ignore_exists=False):
-    curr_base_path = export_dir
-    modeldb_paths = db["FullPath"].values.tolist()
-    relative_match = "/exports(.+)"
-    re_relative_match = re.compile(relative_match)
-    new_modeldb_paths = []
-    for x in modeldb_paths:
-        matches = re.findall(re_relative_match, x)
-        if matches:
-            relative_path = matches[0]
-        else:
-            print(x)
-            print("match not found")
-            return
-        new_path = curr_base_path + relative_path
-        if os.path.isfile(new_path) or ignore_exists:
-            new_modeldb_paths.append(new_path)
-        else:
-            print(x)
-            print(new_path)
-            print("new path does not exist")
-            return
-    db["FullPath"] = new_modeldb_paths
-    return db
+        fit_params = {"feature_name":X,
+                "categorical_feature":category_cols}
 
-def update_base_paths(ignore_exists=False, path_to_db=modeldb_path):
-    db = load_modeldb(path_to_db)
-    db = update_base_paths_db(db, ignore_exists)
-    if not db.empty:
-        #replace existing DB with updated version
-        save_obj(db, path_to_db)
-    else:
-        print("Model db was not updated")
+        fig_arr = []
+        best_params = []
+        for score_fn in scoring.keys():
 
-def load_all_models(models_df):
-    model_dict = {}
-    for index, row in models_df.iterrows():
-        curr_model = load_obj(row['FullPath'])
-        model_dict[row['ModelNum']] = curr_model
-    return model_dict
+            gs = RandomizedSearchCV(lgb.LGBMRegressor(), param_distributions=params_distr, scoring=scoring,
+                    n_iter=gs_iterations, n_jobs=1, fit_params=fit_params, refit=score_fn, cv=3, return_train_score=True)
 
-def load_model(model_num, path_to_db=modeldb_path):
-    if not os.path.isfile(path_to_db):
-        print("No Model DB found.")
-        return
+            gs.fit(X_arr, y_arr)
 
-    models_df = load_obj(path_to_db)
-    results = models_df.query("ModelNum == " + str(model_num))
+            results = gs.cv_results_
+            best_param = gs.best_params_
+            print("Best Parameters using %s :" % score_fn)
+            print(best_param)
+            best_params.append(best_param)
 
-    if len(results) == 1:
-        model_path = results['FullPath'].iloc[0]
-        model = load_obj(model_path)
-        return model
-    elif len(results) > 1:
-        print("More than one model with this # found.")
-    else:
-        print("No matches for this given model #.")
+            res = pd.DataFrame(results)
 
-def load_model_features(model_num, path_to_db=modeldb_path):
-    if not os.path.isfile(path_to_db):
-        print("No Model DB found.")
-        return
+            for i in params_distr.keys():
+                fig = plt.figure(figsize=(8,6), dpi=200)
+                ax = fig.add_subplot(111)
+                ax.set_title("GridSearchCV evaluating using " + str(score_fn))
+                ax.set_xlabel(i)
+                ax.set_ylabel("Score")
+                res.sort_values("param_%s" % i, inplace=True)
+                X_axis = np.array(res['param_%s' % i].values, dtype=float)
+                
+                for scorer, color in zip(sorted(scoring), ['g', 'k']):
+                    for sample, style in (('train', '--'), ('test', '-')):
+                        sample_score_mean = res['mean_%s_%s' % (sample, scorer)].values.tolist()
+                        sample_score_std = res['std_%s_%s' % (sample, scorer)].values.tolist()
+                        ax.fill_between(X_axis, sample_score_mean - sample_score_std,
+                                sample_score_mean + sample_score_std,
+                                alpha=0.1 if sample == 'test' else 0, color=color)
+                        ax.plot(X_axis, sample_score_mean, style, color=color,
+                                alpha=1 if sample == 'test' else 0.7,
+                                label="%s (%s)" % (scorer, sample))
 
-    models_df = load_obj(path_to_db)
-    results = models_df.query("ModelNum == " + str(model_num))
+                best_index = np.nonzero(results['rank_test_%s' % scorer] == 1)[0][0]
+                best_score = results['mean_test_%s' % scorer][best_index]
 
-    if len(results) == 1:
-        features_used = results['FeaturesUsed'].iloc[0]
-        features_used = eval(features_used)
-        return features_used
-    elif len(results) > 1:
-        print("More than one model with this # found.")
-    else:
-        print("No matches for this given model #.")
+                # Plot a dotted vertical line at the best score for that scorer marked by x
+                ax.plot([X_axis[best_index], ] * 2, [0, best_score],
+                        linestyle='-.', color=color, marker='s', markeredgewidth=3, ms=8)
 
-#given a step #, pull all the models created from that step
-def load_modelnums_fromstep(stepnum):
-    df = load_modeldb()
-    try:
-        #in a try statement since modeldb may not have a Step column yet
-        df = df.query("Step == " + str(stepnum))
-        if not df.empty:
-            modelnums = df["ModelNum"].values.tolist()
-            return modelnums
-        else:
-            return []
-    except:
-        return []
+                # Annotate the best score for that scorer
+                ax.annotate("%0.2f" % best_score,
+                            (X_axis[best_index], best_score + 0.005))
 
-def load_subsetnum_frommodelnum(modelnum):
-    df = load_modeldb()
-    df = df.query("ModelNum == " + str(modelnum))
-    if not df.empty and len(df) == 1:
-        subsetnum = df["Subset"].iloc[0]
-        return int(subsetnum)
-    else:
-        return False
+                handles, labels = ax.get_legend_handles_labels()
+                ax.legend(handles,labels)
 
+                fig_arr.append(fig)
 
-def modeldb_add(model_dict, step, path_to_db=modeldb_path):
-    model_dict["Step"] = step
-    curr_df = pd.DataFrame(model_dict, index=[0])
+        return fig_arr, best_params
 
-    #load in models_df
-    models_df = load_modeldb(path_to_db)
-
-    #update models_df with new model data and save
-    models_df = models_df.append(curr_df, ignore_index=True)
-    save_obj(models_df,path_to_db)
-
-def modeldb_add_df(curr_models_df, step, path_to_db=modeldb_path):
-    curr_models_df["Step"] = step
-    #load in models_df
-    models_df = load_modeldb(path_to_db)
-
-    #update models_df with new model data and save
-    models_df = pd.concat([models_df, curr_models_df], ignore_index=True)
-    save_obj(models_df,path_to_db)
-
-
-#this function takes a unique model number and the path to the DB
-def modeldb_delete(model_num, path_to_db):
-    #load in models_df
-    if os.path.isfile(path_to_db):
-        models_df = load_obj(path_to_db)
-    else:
-        print("model db is not at specified path.")
-        return
-
-    results = models_df.query('ModelNum == ' + str(model_num))
-    if len(results) == 1:
-        #delete the model
-        del_path = results['ModelPath'].iloc[0]
-        os.remove(del_path)
-        #save new df
-        models_df = models_df[models_df['ModelNum'] != model_num]
-        save_obj(models_df,path_to_db)
-    else:
-        print("No Unique Match Found")
-        print("Results: ")
-        print(results)
-
-def modeldb_delete_step(step, path_to_db=modeldb_path):
-    #load in models_df
-    if os.path.isfile(path_to_db):
-        models_df = load_obj(path_to_db)
-    else:
-        print("model db is not at specified path.")
-        return
-
-    del_df = models_df.query('Step == ' + str(step))
-    models_df = models_df.query('Step != ' + str(step))
-    save_obj(models_df,path_to_db)
-    print("Removed " + str(len(del_df)) + " models.")
-
-
-def model_name_gen(attributes_list):
-    counter_path = os.path.dirname(__file__) + '/modelcounter.pk'
-    if os.path.isfile(counter_path):
-        old_count = load_obj(counter_path)
-        new_count = old_count + 1
-    else:
-        new_count = 0
-
-    model_name = "_".join(attributes_list + ['model' + str(new_count)])
-    save_obj(new_count, counter_path)
-    return model_name, new_count
-
-def reset_model_counter():
-    counter_path = os.path.dirname(__file__) + '/modelcounter.pk'
-    if os.path.isfile(counter_path):
-        os.remove(counter_path)
-    else:
-        print("The counter does not exist.")
-
-def reset_modeldb():
-    if os.path.isfile(modeldb_path):
-        reset_model_counter()
-        os.remove(modeldb_path)
-    else:
-        print("Model DB does not exist.")

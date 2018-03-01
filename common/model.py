@@ -12,7 +12,7 @@ Purpose: Hosts the Model object & its functions to interact with model propertie
 """
 from common.utils import ensure_folder, save_obj, load_obj
 from common.multivariateanalysis import var_importance_table
-from common.modelanalysis import r2_mse_grab, train_test_confusion_plot_full
+from common.modelanalysis import r2_mse_grab, train_test_confusion_plot_full, get_accuracy
 
 class Model(object):
     """ 
@@ -107,8 +107,8 @@ class Model(object):
 
     # Setters
     def set_metadata_with_dataset(self, dataset):
-        train_shape = (dataset.get_train_X_shape()[0], self.num_features)
-        test_shape = (dataset.get_test_X_shape()[0], self.num_features)
+        train_shape = (dataset.train_df.shape[0], self.num_features)
+        test_shape = (dataset.test_df.shape[0], self.num_features)
         random_vars = dataset.get_random_variables()
 
         self.dataset_name = dataset.get_name()
@@ -150,10 +150,9 @@ class Model(object):
         self.test_y_pred = test_y_pred
         self.train_y_pred = train_y_pred
 
-    def confusion_matrix(self, ds):
+    def confusion_matrix(self, ds, full_dist=False):
         test_y_arr, train_y_arr = ds.get_test_train_var_arrays(self.y)
         reverse_var, reverse_transform_spec = ds.get_reverse_transform_spec(self.y)
         curr_tile = ds.tile_func
-        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, curr_tile, reverse_transform_spec)
+        fig_arr = train_test_confusion_plot_full(self.train_y_pred, self.test_y_pred, train_y_arr, test_y_arr, self.y, curr_tile, reverse_transform_spec, full_dist)
         return fig_arr
-

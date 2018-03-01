@@ -15,6 +15,7 @@ from common.tilefile import create_tiling, ntile
 from sklearn.model_selection import train_test_split
 from common.univariateanalysis import suggest_transform_fn, apply_spec_to_df
 from common.multivariateanalysis import full_analysis, safe_loc
+from common.modelanalysis import get_accuracy
 from common.graphing import figures_to_pdf, hist_prob_plot, histogram_boxcox_plot
 from common.imputations import (impute_categories, apply_le_dict, get_means, impute_na_rows, impute_blacklist, 
         add_random_variables, impute_conditions, impute_to_value)
@@ -23,7 +24,7 @@ from copy import deepcopy
 from numpy import array
 import os
 import shutil
-
+import pandas as pd
 
 class Dataset(object):
     """ 
@@ -302,6 +303,14 @@ class Dataset(object):
         self.test_X_shape = test_X_shape
         return test_X_arr, train_X_arr
 
+    def get_X_array(self, X=False):
+        if not X:
+            X = self.X
+        df = self.df
+        X_df = df[X]
+        X_arr = array(X_df)
+        return X_arr
+
     def get_train_X_shape(self):
         return self.train_X_shape
     
@@ -317,6 +326,12 @@ class Dataset(object):
         test_var_series = test_df[var]
         test_var_arr = array(test_var_series)
         return test_var_arr, train_var_arr
+
+    def get_var_array(self, var):
+        df = self.df
+        var_series = df[var]
+        var_arr = array(var_series)
+        return var_arr
 
     #dyanmic op; so not a part of operations
     def tile_y(self, num_tiles):
@@ -475,3 +490,19 @@ class Dataset(object):
         include = [select_y] + self.get_non_y()
         self.df = self.df[include]
         self.new_op("prune_y", select_y)
+
+    def custom_accuracy(self, y_actual, y_pred):
+        y = self.get_y()
+        reverse_var, rev_transform_spec = self.get_reverse_transform_spec(y)
+        curr_tile = self.tile_func
+
+        pred_df = pd.DataFrame({y: y_pred})
+        pred_df = apply_spec_to_df(y, rev_transform_spec, pred_df)
+        predicted_tile = pred_df[y].apply(curr_tile)
+
+        actual_df = pd.DataFrame({y: y_actual})
+        actual_df = apply_spec_to_df(y, rev_transform_spec, actual_df)
+        actual_tile = actual_df[y].apply(curr_tile)
+
+        acc = get_accuracy(actual_tile, predicted_tile, 0)
+        return acc
