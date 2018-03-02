@@ -28,6 +28,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from config.config import gs_iterations
+from sklearn.externals.joblib import parallel_backend
 
 #Sample Model Metadata
 #    
@@ -260,12 +261,12 @@ class Model_Manager(object):
                     early_stopping_rounds=5,
                     categorical_feature=category_cols,
                     feature_name=X,
-                    verbose=-1)
+                    verbose=False)
         except:
             gbm_model_object.fit(X_arr, y_arr,
                     categorical_feature=category_cols,
                     feature_name=X,
-                    verbose=-1)
+                    verbose=False)
         #save this model for later analysis
         model_algo = 'lgbm'
         model_name = step_tag + "_" + model_algo
@@ -294,19 +295,20 @@ class Model_Manager(object):
         params_distr = {'learning_rate': scipy.stats.expon(scale=0.1),
                         'n_estimators': scipy.stats.randint(50, 400),
                         'max_depth': scipy.stats.randint(3, 15), 
-                        'num_leaves': [5,10,20,30,40]}
+                        'num_leaves': [4,8,12,20,30]}
 
         fit_params = {"feature_name":X,
-                "categorical_feature":category_cols}
+                "categorical_feature":category_cols, 
+                "verbose":False}
 
         fig_arr = []
         best_params = []
         for score_fn in scoring.keys():
 
             gs = RandomizedSearchCV(lgb.LGBMRegressor(), param_distributions=params_distr, scoring=scoring,
-                    n_iter=gs_iterations, n_jobs=1, fit_params=fit_params, refit=score_fn, cv=3, return_train_score=True)
-
-            gs.fit(X_arr, y_arr)
+                    n_iter=gs_iterations, n_jobs=-1, fit_params=fit_params, refit=score_fn, cv=3, return_train_score=True)
+            with parallel_backend('threading'):
+                gs.fit(X_arr, y_arr)
 
             results = gs.cv_results_
             best_param = gs.best_params_
@@ -327,8 +329,8 @@ class Model_Manager(object):
                 
                 for scorer, color in zip(sorted(scoring), ['g', 'k']):
                     for sample, style in (('train', '--'), ('test', '-')):
-                        sample_score_mean = res['mean_%s_%s' % (sample, scorer)].values.tolist()
-                        sample_score_std = res['std_%s_%s' % (sample, scorer)].values.tolist()
+                        sample_score_mean = res['mean_%s_%s' % (sample, scorer)].values
+                        sample_score_std = res['std_%s_%s' % (sample, scorer)].values
                         ax.fill_between(X_axis, sample_score_mean - sample_score_std,
                                 sample_score_mean + sample_score_std,
                                 alpha=0.1 if sample == 'test' else 0, color=color)
