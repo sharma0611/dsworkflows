@@ -4,7 +4,7 @@ variable "public_key_path"            {default = "~/.ssh/shivam.pub"}
 
 # Resource Tags
 variable "owner_contact"              { default = "sharma.shivam0611@gmail.com" }
-variable "project"                    { default = "coincrunch"}
+variable "project"                    { default = "dsworkflows"}
 variable "maid_offhours"              { default = "tz=et"}
 
 # Instance details
@@ -12,7 +12,7 @@ variable "key_name"                   { default = "shivam_key" }
 variable "iam_instance_profile"       { default = "sharma0611" }
 variable "subnet_id"                  { default = "subnet-f90fb590" }
 variable "security_groups"            { default = "sg-22c2c247" }
-variable "instance_type"              { default = "c5.xlarge" }
+variable "instance_type"              { default = "c5.large" }
 variable "availability_zone"          { default = "us-west-1a" }
 variable "root_block_device_vol_size" { default = 20 }
 
