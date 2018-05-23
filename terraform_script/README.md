@@ -1,4 +1,4 @@
-# coincrunch-terraform
+# dsworkflows-terraform 
 TF Scripts to provision EC2 Instance to run computationally expensive tasks.
 
 
