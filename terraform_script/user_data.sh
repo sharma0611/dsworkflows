@@ -42,4 +42,4 @@ echo "user_data.sh complete"
 #commands created to run program
 echo 'Now running dsworkflows suite:'
 source /home/admin/.bashrc
-su - admin -c 'cd $HOME/dsworkflows;source env/bin/activate;bash runall'
+#su - admin -c 'cd $HOME/dsworkflows;source env/bin/activate;bash runall'
