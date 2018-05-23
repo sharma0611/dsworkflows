@@ -21,6 +21,8 @@ import re
 from sklearn.metrics import mean_squared_error, r2_score, confusion_matrix
 from importlib import import_module
 import importlib.util
+import matplotlib as mpl
+mpl.use("TkAgg")
 import matplotlib.backends.backend_pdf
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
