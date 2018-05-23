@@ -1,0 +1,3 @@
+source ./s3bucket
+aws s3 cp ../data/train.csv s3://$BUCKETNAME/train.csv
+aws s3 cp ../config/config.py s3://$BUCKETNAME/config.py

@@ -26,6 +26,11 @@ git clone --recursive https://github.com/Microsoft/LightGBM
 cd LightGBM/python-package
 python setup.py install --gpu
 
+#get all data files from buckets
+source ~/dsworkflows/terraform_script/s3bucket
+aws s3 cp s3://$BUCKETNAME/train.csv ~/dsworkflows/data/train.csv
+aws s3 cp s3://$BUCKETNAME/config.py ~/dsworkflows/config/config.py
+
 echo 'source $HOME/dsworkflows/env/bin/activate' >> $HOME/.bashrc
 
 echo 'ec2_provision.sh complete' 
